@@ -31,12 +31,13 @@ import `in`.dattam.smsforwarder.data.ForwardingRule
 fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewModel()) {
     val existing = vm.rules.value.firstOrNull { it.id == ruleId }
 
+    val isNew = ruleId <= 0
     var name by remember { mutableStateOf("") }
-    var pattern by remember { mutableStateOf("*") }
+    var pattern by remember { mutableStateOf(if (isNew) ".*-GOV-.*" else "") }
     var bodyPattern by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
     var headers by remember { mutableStateOf("{}") }
-    var bodyTemplate by remember { mutableStateOf("") }
+    var bodyTemplate by remember { mutableStateOf(if (isNew) SAMPLE_BODY_TEMPLATE else "") }
     var contentType by remember { mutableStateOf("application/json; charset=utf-8") }
     var retries by remember { mutableStateOf("10") }
     var sim by remember { mutableStateOf("0") }
@@ -61,17 +62,11 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
             OutlinedTextField(
                 pattern, { pattern = it },
                 label = { Text("Sender patterns (one per line, OR)") },
-                placeholder = {
-                    Text(
-                        "*-GOV-*\n" +
-                            "VM-HDFCBK\n" +
-                            "re:^VK-\\d{4}$"
-                    )
-                },
                 supportingText = {
                     Text(
-                        "Each line: wildcard by default (* and ?). " +
-                            "Prefix with 're:' for regex."
+                        "Each line is a Java regex, anchored (whole-string match). " +
+                            "Plain strings match themselves exactly. Use .* for wildcard, " +
+                            ".*-GOV-.* for substring."
                     )
                 },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
@@ -80,7 +75,7 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
             OutlinedTextField(
                 bodyPattern, { bodyPattern = it },
                 label = { Text("Body regex filter (optional)") },
-                placeholder = { Text("OTP|code") },
+                supportingText = { Text("Substring regex match; leave blank to skip.") },
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -89,13 +84,13 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
             OutlinedTextField(
                 headers, { headers = it },
                 label = { Text("Headers JSON") },
-                placeholder = { Text("""{"Authorization": "Bearer ..."}""") },
+                supportingText = { Text("Merged with app-wide default headers; rule keys win.") },
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 bodyTemplate, { bodyTemplate = it },
-                label = { Text("Body template (optional)") },
-                placeholder = { Text("Leave blank to use the default payload.") },
+                label = { Text("Body template") },
+                supportingText = { Text("Clear to inherit the default body template from settings.") },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
                 minLines = 4,
             )
