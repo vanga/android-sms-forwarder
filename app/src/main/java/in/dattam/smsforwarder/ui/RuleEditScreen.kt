@@ -83,8 +83,13 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
             OutlinedTextField(url, { url = it }, label = { Text("URL") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(
                 headers, { headers = it },
-                label = { Text("Headers JSON") },
-                supportingText = { Text("Merged with app-wide default headers; rule keys win.") },
+                label = { Text("Headers JSON (rule-specific)") },
+                supportingText = {
+                    Text(
+                        "Leave as {} to use only app-wide default headers. " +
+                            "Rule keys override defaults on collision."
+                    )
+                },
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
@@ -94,10 +99,7 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
                 modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
                 minLines = 4,
             )
-            PlaceholderHelper(
-                onInsert = { bodyTemplate += it },
-                onInsertSample = { if (bodyTemplate.isBlank()) bodyTemplate = SAMPLE_BODY_TEMPLATE },
-            )
+            PlaceholderHelper(onInsert = { bodyTemplate += it })
             OutlinedTextField(
                 contentType, { contentType = it },
                 label = { Text("Content-Type") },

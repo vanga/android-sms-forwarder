@@ -6,11 +6,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+
+val SAMPLE_HEADERS_JSON: String = """
+{
+  "X-Api-Key": "replace-with-your-shared-secret"
+}
+""".trimIndent()
 
 val SAMPLE_BODY_TEMPLATE: String = """
 {
@@ -32,10 +37,7 @@ private val PLACEHOLDERS = listOf(
 
 /** Chips that append a placeholder to the target field on tap, plus a doc list. */
 @Composable
-fun PlaceholderHelper(
-    onInsert: (String) -> Unit,
-    onInsertSample: (() -> Unit)? = null,
-) {
+fun PlaceholderHelper(onInsert: (String) -> Unit) {
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -43,9 +45,6 @@ fun PlaceholderHelper(
     ) {
         PLACEHOLDERS.forEach { (token, _) ->
             AssistChip(onClick = { onInsert(token) }, label = { Text(token) })
-        }
-        onInsertSample?.let {
-            TextButton(onClick = it) { Text("Insert sample") }
         }
     }
     PLACEHOLDERS.forEach { (token, doc) ->

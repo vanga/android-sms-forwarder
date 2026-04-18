@@ -42,7 +42,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 @Composable
 fun SettingsScreen(onDone: () -> Unit, vm: SettingsViewModel = viewModel()) {
     var loaded by remember { mutableStateOf(false) }
-    var headers by remember { mutableStateOf("{}") }
+    var headers by remember { mutableStateOf(SAMPLE_HEADERS_JSON) }
     var bodyTemplate by remember { mutableStateOf("") }
     var contentType by remember { mutableStateOf(AppDefaults.FALLBACK_CONTENT_TYPE) }
 
@@ -67,7 +67,12 @@ fun SettingsScreen(onDone: () -> Unit, vm: SettingsViewModel = viewModel()) {
             OutlinedTextField(
                 headers, { headers = it },
                 label = { Text("Default Headers JSON") },
-                placeholder = { Text("""{"Authorization": "Bearer ...", "X-API-Key": "..."}""") },
+                supportingText = {
+                    Text(
+                        "Shared across all rules. Typical use: a shared-secret token " +
+                            "header so your server can authenticate the webhook."
+                    )
+                },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 90.dp),
                 minLines = 3,
             )
@@ -78,10 +83,7 @@ fun SettingsScreen(onDone: () -> Unit, vm: SettingsViewModel = viewModel()) {
                 modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
                 minLines = 5,
             )
-            PlaceholderHelper(
-                onInsert = { bodyTemplate += it },
-                onInsertSample = { if (bodyTemplate.isBlank()) bodyTemplate = SAMPLE_BODY_TEMPLATE },
-            )
+            PlaceholderHelper(onInsert = { bodyTemplate += it })
             OutlinedTextField(
                 contentType, { contentType = it },
                 label = { Text("Default Content-Type") },
