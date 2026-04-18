@@ -1,0 +1,4 @@
+-keepattributes *Annotation*, InnerClasses
+-keep,includedescriptorclasses class `in`.dattam.smsforwarder.**$$serializer { *; }
+-keepclassmembers class `in`.dattam.smsforwarder.** { *** Companion; }
+-keepclasseswithmembers class `in`.dattam.smsforwarder.** { kotlinx.serialization.KSerializer serializer(...); }
