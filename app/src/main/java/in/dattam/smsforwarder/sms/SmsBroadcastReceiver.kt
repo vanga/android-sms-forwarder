@@ -32,7 +32,7 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
         val body = messages.joinToString("") { it.displayMessageBody.orEmpty() }
         val preview = body.take(120)
 
-        val slotIdRaw = intent.extras?.let { SimSlotDetector.detect(it) } ?: -1
+        val slotIdRaw = SimSlotDetector.detect(context, intent)
         val slotId = if (slotIdRaw < 0) 0 else slotIdRaw + 1
 
         Log.i(TAG, "RECEIVED from=$sender slot=$slotId bodyLen=${body.length}")
