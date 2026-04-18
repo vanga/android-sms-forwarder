@@ -38,7 +38,6 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
     var url by remember { mutableStateOf("") }
     var headers by remember { mutableStateOf("{}") }
     var bodyTemplate by remember { mutableStateOf(if (isNew) SAMPLE_BODY_TEMPLATE else "") }
-    var contentType by remember { mutableStateOf("application/json; charset=utf-8") }
     var retries by remember { mutableStateOf("10") }
     var sim by remember { mutableStateOf("0") }
 
@@ -46,7 +45,7 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
         existing?.let {
             name = it.name; pattern = it.senderPattern
             bodyPattern = it.bodyPattern.orEmpty(); url = it.url; headers = it.headersJson
-            bodyTemplate = it.bodyTemplate.orEmpty(); contentType = it.bodyContentType
+            bodyTemplate = it.bodyTemplate.orEmpty()
             retries = it.retries.toString(); sim = it.simSlot.toString()
         }
     }
@@ -100,11 +99,6 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
                 minLines = 4,
             )
             PlaceholderHelper(onInsert = { bodyTemplate += it })
-            OutlinedTextField(
-                contentType, { contentType = it },
-                label = { Text("Content-Type") },
-                modifier = Modifier.fillMaxWidth(),
-            )
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(retries, { retries = it.filter(Char::isDigit) }, label = { Text("Retries") }, modifier = Modifier.weight(1f))
@@ -120,7 +114,6 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
                         url = url,
                         headersJson = headers.ifBlank { "{}" },
                         bodyTemplate = bodyTemplate.ifBlank { null },
-                        bodyContentType = contentType.ifBlank { "application/json; charset=utf-8" },
                         retries = retries.toIntOrNull() ?: 10,
                         simSlot = sim.toIntOrNull() ?: 0,
                     )

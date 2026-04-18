@@ -5,7 +5,6 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import `in`.dattam.smsforwarder.data.AppDatabase
-import `in`.dattam.smsforwarder.data.AppDefaults
 import `in`.dattam.smsforwarder.data.EventLog
 import `in`.dattam.smsforwarder.data.SettingsRepo
 import kotlinx.serialization.json.Json
@@ -64,18 +63,13 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
                 put("sim", simLabel)
             }.toString()
 
-        val effectiveContentType = rule.bodyContentType
-            .takeIf { it.isNotBlank() && it != AppDefaults.FALLBACK_CONTENT_TYPE }
-            ?: defaults.contentType
-        val mediaType = runCatching { effectiveContentType.toMediaType() }.getOrDefault(JSON_MEDIA)
-
         val mergedHeaders = mergeHeaders(defaults.headersJson, rule.headersJson)
 
         return try {
             val client = buildClient(rule.ignoreSsl)
             val reqBuilder = Request.Builder()
                 .url(rule.url)
-                .post(payload.toRequestBody(mediaType))
+                .post(payload.toRequestBody(JSON_MEDIA))
             mergedHeaders.forEach { (k, v) -> reqBuilder.addHeader(k, v.toString().trim('"')) }
 
             client.newCall(reqBuilder.build()).execute().use { resp ->

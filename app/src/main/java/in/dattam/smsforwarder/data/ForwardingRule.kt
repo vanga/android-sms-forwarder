@@ -15,10 +15,13 @@ import androidx.room.PrimaryKey
  *   REGEX    — raw Java regex.
  * [simSlot] 0 = any, 1/2 = specific SIM.
  *
- * [bodyTemplate] is the request body. If null, a default JSON payload is sent
- * (from/text/sentStamp/receivedStamp/sim). Otherwise placeholders are substituted:
- *   %from%, %text%, %sentStamp%, %receivedStamp%, %sim%
- * [bodyContentType] is the Content-Type header for the request body.
+ * [bodyTemplate] is the JSON request body. If null, a default JSON payload is
+ * sent (from/text/sentStamp/receivedStamp/sim). Otherwise placeholders are
+ * substituted: %from%, %text%, %sentStamp%, %receivedStamp%, %sim%. Body is
+ * always POSTed as application/json — add other content types later if ever
+ * required.
+ *
+ * [bodyContentType] is retained in the schema for back-compat; no longer used.
  */
 @Entity(tableName = "forwarding_rules")
 data class ForwardingRule(

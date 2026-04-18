@@ -44,13 +44,11 @@ fun SettingsScreen(onDone: () -> Unit, vm: SettingsViewModel = viewModel()) {
     var loaded by remember { mutableStateOf(false) }
     var headers by remember { mutableStateOf(SAMPLE_HEADERS_JSON) }
     var bodyTemplate by remember { mutableStateOf("") }
-    var contentType by remember { mutableStateOf(AppDefaults.FALLBACK_CONTENT_TYPE) }
 
     LaunchedEffect(Unit) {
         val d = vm.load()
         headers = d.headersJson
         bodyTemplate = d.bodyTemplate
-        contentType = d.contentType
         loaded = true
     }
 
@@ -84,18 +82,12 @@ fun SettingsScreen(onDone: () -> Unit, vm: SettingsViewModel = viewModel()) {
                 minLines = 5,
             )
             PlaceholderHelper(onInsert = { bodyTemplate += it })
-            OutlinedTextField(
-                contentType, { contentType = it },
-                label = { Text("Default Content-Type") },
-                modifier = Modifier.fillMaxWidth(),
-            )
             Button(
                 onClick = {
                     vm.save(
                         AppDefaults(
                             headersJson = headers.ifBlank { "{}" },
                             bodyTemplate = bodyTemplate,
-                            contentType = contentType.ifBlank { AppDefaults.FALLBACK_CONTENT_TYPE },
                         ),
                         onDone,
                     )

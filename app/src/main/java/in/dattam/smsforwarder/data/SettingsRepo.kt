@@ -13,12 +13,7 @@ import kotlinx.coroutines.flow.map
 data class AppDefaults(
     val headersJson: String,
     val bodyTemplate: String,
-    val contentType: String,
-) {
-    companion object {
-        const val FALLBACK_CONTENT_TYPE = "application/json; charset=utf-8"
-    }
-}
+)
 
 private val Context.dataStore by preferencesDataStore(name = "app_defaults")
 
@@ -26,7 +21,6 @@ class SettingsRepo(private val ctx: Context) {
     private object Keys {
         val HEADERS = stringPreferencesKey("default_headers_json")
         val BODY = stringPreferencesKey("default_body_template")
-        val CONTENT_TYPE = stringPreferencesKey("default_content_type")
     }
 
     val flow: Flow<AppDefaults> = ctx.dataStore.data.map { p -> p.toDefaults() }
@@ -37,13 +31,11 @@ class SettingsRepo(private val ctx: Context) {
         ctx.dataStore.edit { p ->
             p[Keys.HEADERS] = d.headersJson
             p[Keys.BODY] = d.bodyTemplate
-            p[Keys.CONTENT_TYPE] = d.contentType
         }
     }
 
     private fun Preferences.toDefaults() = AppDefaults(
         headersJson = this[Keys.HEADERS] ?: "{}",
         bodyTemplate = this[Keys.BODY] ?: "",
-        contentType = this[Keys.CONTENT_TYPE] ?: AppDefaults.FALLBACK_CONTENT_TYPE,
     )
 }
