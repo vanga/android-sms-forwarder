@@ -14,7 +14,7 @@ class EnumConverters {
     @TypeConverter fun toMode(v: String) = PatternMode.valueOf(v)
 }
 
-@Database(entities = [ForwardingRule::class, EventLog::class], version = 2, exportSchema = false)
+@Database(entities = [ForwardingRule::class, EventLog::class], version = 3, exportSchema = false)
 @TypeConverters(EnumConverters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun ruleDao(): RuleDao
@@ -42,6 +42,15 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE forwarding_rules ADD COLUMN bodyTemplate TEXT")
+                db.execSQL(
+                    "ALTER TABLE forwarding_rules ADD COLUMN bodyContentType TEXT NOT NULL DEFAULT 'application/json; charset=utf-8'"
+                )
+            }
+        }
+
         @Volatile private var instance: AppDatabase? = null
         fun get(ctx: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(
@@ -49,7 +58,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 "smsforwarder.db"
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
                 .also { instance = it }
         }

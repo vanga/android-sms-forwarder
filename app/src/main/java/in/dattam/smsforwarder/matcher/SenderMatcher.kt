@@ -12,16 +12,22 @@ object SenderMatcher {
     }
 
     private fun matchSender(rule: ForwardingRule, sender: String): Boolean {
-        val p = rule.senderPattern
-        if (p == "*" || p.isBlank()) return true
-        return when (rule.patternMode) {
-            PatternMode.EXACT -> sender.equals(p, ignoreCase = true)
-            PatternMode.WILDCARD -> Regex(wildcardToRegex(p), RegexOption.IGNORE_CASE).matches(sender)
+        val lines = rule.senderPattern.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toList()
+        if (lines.isEmpty() || lines.any { it == "*" }) return true
+        return lines.any { line -> matchOne(rule.patternMode, line, sender) }
+    }
+
+    private fun matchOne(mode: PatternMode, pattern: String, sender: String): Boolean =
+        when (mode) {
+            PatternMode.EXACT -> sender.equals(pattern, ignoreCase = true)
+            PatternMode.WILDCARD -> Regex(wildcardToRegex(pattern), RegexOption.IGNORE_CASE).matches(sender)
             PatternMode.REGEX -> runCatching {
-                Regex(p, RegexOption.IGNORE_CASE).containsMatchIn(sender)
+                Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(sender)
             }.getOrDefault(false)
         }
-    }
 
     /** Shell glob → regex. Supports * and ? only. */
     private fun wildcardToRegex(glob: String): String = buildString {

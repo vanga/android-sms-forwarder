@@ -47,13 +47,18 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         events.log(EventLog(stage = "ENQUEUED", sender = sender, bodyPreview = preview,
             ruleId = rule.id, ruleName = rule.name, attempt = attempt))
 
-        val payload = buildJsonObject {
-            put("from", sender)
-            put("text", body)
-            put("sentStamp", sentTs)
-            put("receivedStamp", recvTs)
-            put("sim", if (sim > 0) "sim$sim" else "undetected")
-        }
+        val simLabel = if (sim > 0) "sim$sim" else "undetected"
+        val payload = rule.bodyTemplate
+            ?.let { substitute(it, sender, body, sentTs, recvTs, simLabel) }
+            ?: buildJsonObject {
+                put("from", sender)
+                put("text", body)
+                put("sentStamp", sentTs)
+                put("receivedStamp", recvTs)
+                put("sim", simLabel)
+            }.toString()
+
+        val mediaType = runCatching { rule.bodyContentType.toMediaType() }.getOrDefault(JSON_MEDIA)
 
         val headers = runCatching { Json.decodeFromString<JsonObject>(rule.headersJson) }
             .getOrDefault(JsonObject(emptyMap()))
@@ -62,7 +67,7 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
             val client = buildClient(rule.ignoreSsl)
             val reqBuilder = Request.Builder()
                 .url(rule.url)
-                .post(payload.toString().toRequestBody(JSON_MEDIA))
+                .post(payload.toRequestBody(mediaType))
             headers.forEach { (k, v) -> reqBuilder.addHeader(k, v.toString().trim('"')) }
 
             client.newCall(reqBuilder.build()).execute().use { resp ->
@@ -110,6 +115,21 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
             b.hostnameVerifier(HostnameVerifier { _, _ -> true })
         }
         return b.build()
+    }
+
+    private fun substitute(
+        template: String, from: String, text: String, sentTs: Long, recvTs: Long, sim: String,
+    ): String {
+        val textEscaped = Json.encodeToString(kotlinx.serialization.json.JsonPrimitive.serializer(),
+            kotlinx.serialization.json.JsonPrimitive(text)).removeSurrounding("\"")
+        val fromEscaped = Json.encodeToString(kotlinx.serialization.json.JsonPrimitive.serializer(),
+            kotlinx.serialization.json.JsonPrimitive(from)).removeSurrounding("\"")
+        return template
+            .replace("%from%", fromEscaped)
+            .replace("%text%", textEscaped)
+            .replace("%sentStamp%", sentTs.toString())
+            .replace("%receivedStamp%", recvTs.toString())
+            .replace("%sim%", sim)
     }
 
     companion object {

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -13,6 +14,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -40,6 +42,8 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
     var bodyPattern by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
     var headers by remember { mutableStateOf("{}") }
+    var bodyTemplate by remember { mutableStateOf("") }
+    var contentType by remember { mutableStateOf("application/json; charset=utf-8") }
     var retries by remember { mutableStateOf("10") }
     var sim by remember { mutableStateOf("0") }
 
@@ -47,6 +51,7 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
         existing?.let {
             name = it.name; pattern = it.senderPattern; mode = it.patternMode
             bodyPattern = it.bodyPattern.orEmpty(); url = it.url; headers = it.headersJson
+            bodyTemplate = it.bodyTemplate.orEmpty(); contentType = it.bodyContentType
             retries = it.retries.toString(); sim = it.simSlot.toString()
         }
     }
@@ -59,14 +64,22 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             OutlinedTextField(name, { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(pattern, { pattern = it }, label = { Text("Sender pattern") }, modifier = Modifier.fillMaxWidth())
 
+            SectionLabel("Senders")
+            OutlinedTextField(
+                pattern, { pattern = it },
+                label = { Text("Sender patterns (one per line, OR)") },
+                placeholder = { Text("*VM-HDFCBK*\n*ICICI*\nVK-SBIINB") },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
+                minLines = 3,
+            )
             ExposedDropdownMenuBox(expanded = modeExpanded, onExpandedChange = { modeExpanded = it }) {
                 OutlinedTextField(
                     value = mode.name, onValueChange = {}, readOnly = true,
                     label = { Text("Pattern mode") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(modeExpanded) },
-                    modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                    modifier = Modifier.fillMaxWidth()
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                 )
                 ExposedDropdownMenu(modeExpanded, { modeExpanded = false }) {
                     PatternMode.entries.forEach { m ->
@@ -74,10 +87,39 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
                     }
                 }
             }
+            OutlinedTextField(
+                bodyPattern, { bodyPattern = it },
+                label = { Text("Body regex filter (optional)") },
+                placeholder = { Text("OTP|code") },
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-            OutlinedTextField(bodyPattern, { bodyPattern = it }, label = { Text("Body regex (optional)") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(url, { url = it }, label = { Text("Webhook URL") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(headers, { headers = it }, label = { Text("Headers JSON") }, modifier = Modifier.fillMaxWidth())
+            SectionLabel("Webhook")
+            OutlinedTextField(url, { url = it }, label = { Text("URL") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                headers, { headers = it },
+                label = { Text("Headers JSON") },
+                placeholder = { Text("""{"Authorization": "Bearer ..."}""") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                bodyTemplate, { bodyTemplate = it },
+                label = { Text("Body template (optional)") },
+                placeholder = {
+                    Text(
+                        "Leave blank for default JSON.\n" +
+                            "Placeholders: %from% %text% %sentStamp% %receivedStamp% %sim%"
+                    )
+                },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
+                minLines = 4,
+            )
+            OutlinedTextField(
+                contentType, { contentType = it },
+                label = { Text("Content-Type") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(retries, { retries = it.filter(Char::isDigit) }, label = { Text("Retries") }, modifier = Modifier.weight(1f))
                 OutlinedTextField(sim, { sim = it.filter(Char::isDigit) }, label = { Text("SIM (0=any)") }, modifier = Modifier.weight(1f))
@@ -86,12 +128,14 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
             Button(
                 onClick = {
                     val rule = (existing ?: ForwardingRule(name = "", senderPattern = "", url = "")).copy(
-                        name = name.ifBlank { pattern },
+                        name = name.ifBlank { pattern.lineSequence().firstOrNull()?.trim().orEmpty() },
                         senderPattern = pattern,
                         patternMode = mode,
                         bodyPattern = bodyPattern.ifBlank { null },
                         url = url,
                         headersJson = headers.ifBlank { "{}" },
+                        bodyTemplate = bodyTemplate.ifBlank { null },
+                        bodyContentType = contentType.ifBlank { "application/json; charset=utf-8" },
                         retries = retries.toIntOrNull() ?: 10,
                         simSlot = sim.toIntOrNull() ?: 0,
                     )
@@ -102,4 +146,9 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
             ) { Text("Save") }
         }
     }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(text, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
 }
