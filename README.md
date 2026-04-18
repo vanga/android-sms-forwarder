@@ -32,12 +32,24 @@ Custom headers (JSON object) are sent alongside the POST.
 
 ## Build
 
+Requires JDK 17+ and Android SDK with API 36 installed. Gradle wrapper is pinned to 9.4.1 in `gradle/wrapper/gradle-wrapper.properties`, but the `gradlew` script + wrapper jar aren't checked in.
+
+One-time setup (pick one):
+
 ```bash
-./gradlew assembleDebug
-# or open in Android Studio (Hedgehog+)
+# Option A: install gradle, generate wrapper
+brew install gradle
+gradle wrapper --gradle-version 9.4.1
+
+# Option B: open project in Android Studio (Koala Feature Drop / 2026.1+)
+# — it will generate the wrapper on first sync.
 ```
 
-If the wrapper is missing, run `gradle wrapper --gradle-version 8.11.1` once.
+Then:
+
+```bash
+./gradlew assembleDebug
+```
 
 ## Reliability notes (read this)
 
