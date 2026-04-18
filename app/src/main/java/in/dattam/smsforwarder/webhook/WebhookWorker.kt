@@ -5,7 +5,9 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import `in`.dattam.smsforwarder.data.AppDatabase
+import `in`.dattam.smsforwarder.data.AppDefaults
 import `in`.dattam.smsforwarder.data.EventLog
+import `in`.dattam.smsforwarder.data.SettingsRepo
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -47,8 +49,12 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         events.log(EventLog(stage = "ENQUEUED", sender = sender, bodyPreview = preview,
             ruleId = rule.id, ruleName = rule.name, attempt = attempt))
 
+        val defaults = SettingsRepo(applicationContext).current()
         val simLabel = if (sim > 0) "sim$sim" else "undetected"
-        val payload = rule.bodyTemplate
+
+        val effectiveTemplate = rule.bodyTemplate?.takeIf { it.isNotBlank() }
+            ?: defaults.bodyTemplate.takeIf { it.isNotBlank() }
+        val payload = effectiveTemplate
             ?.let { substitute(it, sender, body, sentTs, recvTs, simLabel) }
             ?: buildJsonObject {
                 put("from", sender)
@@ -58,17 +64,19 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
                 put("sim", simLabel)
             }.toString()
 
-        val mediaType = runCatching { rule.bodyContentType.toMediaType() }.getOrDefault(JSON_MEDIA)
+        val effectiveContentType = rule.bodyContentType
+            .takeIf { it.isNotBlank() && it != AppDefaults.FALLBACK_CONTENT_TYPE }
+            ?: defaults.contentType
+        val mediaType = runCatching { effectiveContentType.toMediaType() }.getOrDefault(JSON_MEDIA)
 
-        val headers = runCatching { Json.decodeFromString<JsonObject>(rule.headersJson) }
-            .getOrDefault(JsonObject(emptyMap()))
+        val mergedHeaders = mergeHeaders(defaults.headersJson, rule.headersJson)
 
         return try {
             val client = buildClient(rule.ignoreSsl)
             val reqBuilder = Request.Builder()
                 .url(rule.url)
                 .post(payload.toRequestBody(mediaType))
-            headers.forEach { (k, v) -> reqBuilder.addHeader(k, v.toString().trim('"')) }
+            mergedHeaders.forEach { (k, v) -> reqBuilder.addHeader(k, v.toString().trim('"')) }
 
             client.newCall(reqBuilder.build()).execute().use { resp ->
                 if (resp.isSuccessful) {
@@ -115,6 +123,15 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
             b.hostnameVerifier(HostnameVerifier { _, _ -> true })
         }
         return b.build()
+    }
+
+    /** Rule headers override app defaults on key collision. */
+    private fun mergeHeaders(defaultsJson: String, ruleJson: String): JsonObject {
+        val defaults = runCatching { Json.decodeFromString<JsonObject>(defaultsJson) }
+            .getOrDefault(JsonObject(emptyMap()))
+        val rule = runCatching { Json.decodeFromString<JsonObject>(ruleJson) }
+            .getOrDefault(JsonObject(emptyMap()))
+        return JsonObject(defaults.toMutableMap().apply { putAll(rule) })
     }
 
     private fun substitute(

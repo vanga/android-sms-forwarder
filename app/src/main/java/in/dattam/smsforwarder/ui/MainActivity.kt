@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
                             RulesScreen(
                                 onEdit = { nav.navigate("edit/${it ?: -1L}") },
                                 onOpenEvents = { nav.navigate("events") },
+                                onOpenSettings = { nav.navigate("settings") },
                             )
                         }
                         composable("edit/{id}") { backStack ->
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
                             RuleEditScreen(ruleId = id, onDone = { nav.popBackStack() })
                         }
                         composable("events") { EventsScreen() }
+                        composable("settings") { SettingsScreen(onDone = { nav.popBackStack() }) }
                     }
                 }
             }

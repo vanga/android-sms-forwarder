@@ -1,0 +1,49 @@
+package `in`.dattam.smsforwarder.data
+
+import android.content.Context
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+
+/** App-wide defaults applied when a rule leaves the corresponding field blank. */
+data class AppDefaults(
+    val headersJson: String,
+    val bodyTemplate: String,
+    val contentType: String,
+) {
+    companion object {
+        const val FALLBACK_CONTENT_TYPE = "application/json; charset=utf-8"
+    }
+}
+
+private val Context.dataStore by preferencesDataStore(name = "app_defaults")
+
+class SettingsRepo(private val ctx: Context) {
+    private object Keys {
+        val HEADERS = stringPreferencesKey("default_headers_json")
+        val BODY = stringPreferencesKey("default_body_template")
+        val CONTENT_TYPE = stringPreferencesKey("default_content_type")
+    }
+
+    val flow: Flow<AppDefaults> = ctx.dataStore.data.map { p -> p.toDefaults() }
+
+    suspend fun current(): AppDefaults = flow.first()
+
+    suspend fun save(d: AppDefaults) {
+        ctx.dataStore.edit { p ->
+            p[Keys.HEADERS] = d.headersJson
+            p[Keys.BODY] = d.bodyTemplate
+            p[Keys.CONTENT_TYPE] = d.contentType
+        }
+    }
+
+    private fun Preferences.toDefaults() = AppDefaults(
+        headersJson = this[Keys.HEADERS] ?: "{}",
+        bodyTemplate = this[Keys.BODY] ?: "",
+        contentType = this[Keys.CONTENT_TYPE] ?: AppDefaults.FALLBACK_CONTENT_TYPE,
+    )
+}

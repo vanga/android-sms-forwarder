@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,6 +35,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 fun RulesScreen(
     onEdit: (Long?) -> Unit,
     onOpenEvents: () -> Unit,
+    onOpenSettings: () -> Unit,
     vm: RulesViewModel = viewModel(),
 ) {
     val rules by vm.rules.collectAsStateWithLifecycle()
@@ -44,6 +46,9 @@ fun RulesScreen(
                 actions = {
                     IconButton(onClick = onOpenEvents) {
                         Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Events")
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Defaults")
                     }
                 },
             )
@@ -66,7 +71,7 @@ fun RulesScreen(
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(rule.name, fontWeight = FontWeight.SemiBold)
-                            Text("from ${rule.senderPattern} [${rule.patternMode}]")
+                            Text("from ${rule.senderPattern.lineSequence().filter { it.isNotBlank() }.joinToString(" | ")}")
                             Text(rule.url, style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
                         }
                         Switch(checked = rule.enabled, onCheckedChange = { vm.toggle(rule) })

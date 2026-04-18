@@ -9,11 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -29,7 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import `in`.dattam.smsforwarder.data.ForwardingRule
-import `in`.dattam.smsforwarder.data.PatternMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,7 +33,6 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
 
     var name by remember { mutableStateOf("") }
     var pattern by remember { mutableStateOf("*") }
-    var mode by remember { mutableStateOf(PatternMode.WILDCARD) }
     var bodyPattern by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
     var headers by remember { mutableStateOf("{}") }
@@ -49,14 +43,12 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
 
     LaunchedEffect(existing?.id) {
         existing?.let {
-            name = it.name; pattern = it.senderPattern; mode = it.patternMode
+            name = it.name; pattern = it.senderPattern
             bodyPattern = it.bodyPattern.orEmpty(); url = it.url; headers = it.headersJson
             bodyTemplate = it.bodyTemplate.orEmpty(); contentType = it.bodyContentType
             retries = it.retries.toString(); sim = it.simSlot.toString()
         }
     }
-
-    var modeExpanded by remember { mutableStateOf(false) }
 
     Scaffold(topBar = { TopAppBar(title = { Text(if (ruleId > 0) "Edit Rule" else "New Rule") }) }) { pad ->
         Column(
@@ -69,24 +61,22 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
             OutlinedTextField(
                 pattern, { pattern = it },
                 label = { Text("Sender patterns (one per line, OR)") },
-                placeholder = { Text("*VM-HDFCBK*\n*ICICI*\nVK-SBIINB") },
+                placeholder = {
+                    Text(
+                        "*-GOV-*\n" +
+                            "VM-HDFCBK\n" +
+                            "re:^VK-\\d{4}$"
+                    )
+                },
+                supportingText = {
+                    Text(
+                        "Each line: wildcard by default (* and ?). " +
+                            "Prefix with 're:' for regex."
+                    )
+                },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
                 minLines = 3,
             )
-            ExposedDropdownMenuBox(expanded = modeExpanded, onExpandedChange = { modeExpanded = it }) {
-                OutlinedTextField(
-                    value = mode.name, onValueChange = {}, readOnly = true,
-                    label = { Text("Pattern mode") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(modeExpanded) },
-                    modifier = Modifier.fillMaxWidth()
-                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                )
-                ExposedDropdownMenu(modeExpanded, { modeExpanded = false }) {
-                    PatternMode.entries.forEach { m ->
-                        DropdownMenuItem(text = { Text(m.name) }, onClick = { mode = m; modeExpanded = false })
-                    }
-                }
-            }
             OutlinedTextField(
                 bodyPattern, { bodyPattern = it },
                 label = { Text("Body regex filter (optional)") },
@@ -130,7 +120,6 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
                     val rule = (existing ?: ForwardingRule(name = "", senderPattern = "", url = "")).copy(
                         name = name.ifBlank { pattern.lineSequence().firstOrNull()?.trim().orEmpty() },
                         senderPattern = pattern,
-                        patternMode = mode,
                         bodyPattern = bodyPattern.ifBlank { null },
                         url = url,
                         headersJson = headers.ifBlank { "{}" },

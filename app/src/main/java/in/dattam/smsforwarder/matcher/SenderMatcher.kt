@@ -1,9 +1,18 @@
 package `in`.dattam.smsforwarder.matcher
 
 import `in`.dattam.smsforwarder.data.ForwardingRule
-import `in`.dattam.smsforwarder.data.PatternMode
 
+/**
+ * Per-line auto-detected matching:
+ *   - Line starting with "re:"  → regex (prefix stripped).
+ *   - Any other line            → wildcard (* and ?), which trivially subsumes
+ *                                 exact match when no wildcards are present.
+ * Case-insensitive throughout. Empty lines are skipped. Any line containing
+ * a bare "*" matches everything. Multiple lines = logical OR.
+ */
 object SenderMatcher {
+
+    private const val REGEX_PREFIX = "re:"
 
     fun matches(rule: ForwardingRule, sender: String, body: String): Boolean {
         if (!matchSender(rule, sender)) return false
@@ -17,17 +26,19 @@ object SenderMatcher {
             .filter { it.isNotEmpty() }
             .toList()
         if (lines.isEmpty() || lines.any { it == "*" }) return true
-        return lines.any { line -> matchOne(rule.patternMode, line, sender) }
+        return lines.any { line -> matchOne(line, sender) }
     }
 
-    private fun matchOne(mode: PatternMode, pattern: String, sender: String): Boolean =
-        when (mode) {
-            PatternMode.EXACT -> sender.equals(pattern, ignoreCase = true)
-            PatternMode.WILDCARD -> Regex(wildcardToRegex(pattern), RegexOption.IGNORE_CASE).matches(sender)
-            PatternMode.REGEX -> runCatching {
-                Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(sender)
+    private fun matchOne(pattern: String, sender: String): Boolean {
+        if (pattern.startsWith(REGEX_PREFIX, ignoreCase = true)) {
+            val body = pattern.substring(REGEX_PREFIX.length).trim()
+            if (body.isEmpty()) return false
+            return runCatching {
+                Regex(body, RegexOption.IGNORE_CASE).containsMatchIn(sender)
             }.getOrDefault(false)
         }
+        return Regex(wildcardToRegex(pattern), RegexOption.IGNORE_CASE).matches(sender)
+    }
 
     /** Shell glob → regex. Supports * and ? only. */
     private fun wildcardToRegex(glob: String): String = buildString {
