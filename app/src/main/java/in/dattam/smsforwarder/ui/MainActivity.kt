@@ -34,11 +34,17 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val nav = rememberNavController()
                     NavHost(nav, startDestination = "rules") {
-                        composable("rules") { RulesScreen(onEdit = { nav.navigate("edit/${it ?: -1L}") }) }
+                        composable("rules") {
+                            RulesScreen(
+                                onEdit = { nav.navigate("edit/${it ?: -1L}") },
+                                onOpenEvents = { nav.navigate("events") },
+                            )
+                        }
                         composable("edit/{id}") { backStack ->
                             val id = backStack.arguments?.getString("id")?.toLongOrNull() ?: -1L
                             RuleEditScreen(ruleId = id, onDone = { nav.popBackStack() })
                         }
+                        composable("events") { EventsScreen() }
                     }
                 }
             }

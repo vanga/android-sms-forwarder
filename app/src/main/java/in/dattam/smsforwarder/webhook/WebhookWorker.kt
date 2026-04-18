@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import `in`.dattam.smsforwarder.data.AppDatabase
+import `in`.dattam.smsforwarder.data.EventLog
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -25,13 +26,26 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         val ruleId = inputData.getLong(KEY_RULE_ID, -1)
         val sender = inputData.getString(KEY_SENDER) ?: return Result.failure()
         val body = inputData.getString(KEY_BODY).orEmpty()
+        val preview = body.take(120)
         val sim = inputData.getInt(KEY_SIM, 0)
         val sentTs = inputData.getLong(KEY_SENT_TS, 0)
         val recvTs = inputData.getLong(KEY_RECV_TS, 0)
         val maxRetries = inputData.getInt(KEY_MAX_RETRIES, 10)
+        val attempt = runAttemptCount + 1
 
-        val rule = AppDatabase.get(applicationContext).ruleDao().allEnabled()
-            .firstOrNull { it.id == ruleId } ?: return Result.failure()
+        val db = AppDatabase.get(applicationContext)
+        val events = db.eventLogDao()
+
+        val rule = db.ruleDao().allEnabled().firstOrNull { it.id == ruleId } ?: run {
+            Log.w(TAG, "rule $ruleId no longer exists; dropping")
+            events.log(EventLog(stage = "FAILED", sender = sender, bodyPreview = preview,
+                ruleId = ruleId, attempt = attempt, detail = "rule deleted"))
+            return Result.failure()
+        }
+
+        Log.i(TAG, "POST rule='${rule.name}' url=${rule.url} attempt=$attempt/$maxRetries")
+        events.log(EventLog(stage = "ENQUEUED", sender = sender, bodyPreview = preview,
+            ruleId = rule.id, ruleName = rule.name, attempt = attempt))
 
         val payload = buildJsonObject {
             put("from", sender)
@@ -52,17 +66,33 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
             headers.forEach { (k, v) -> reqBuilder.addHeader(k, v.toString().trim('"')) }
 
             client.newCall(reqBuilder.build()).execute().use { resp ->
-                if (resp.isSuccessful) Result.success()
-                else retryOrFail(maxRetries, "HTTP ${resp.code}")
+                if (resp.isSuccessful) {
+                    Log.i(TAG, "POSTED ${resp.code} rule='${rule.name}'")
+                    events.log(EventLog(stage = "POSTED", sender = sender, bodyPreview = preview,
+                        ruleId = rule.id, ruleName = rule.name, httpCode = resp.code, attempt = attempt))
+                    Result.success()
+                } else {
+                    retryOrFail(events, rule.id, rule.name, sender, preview,
+                        maxRetries, attempt, "HTTP ${resp.code}", resp.code)
+                }
             }
         } catch (e: IOException) {
-            retryOrFail(maxRetries, e.message ?: "io-error")
+            retryOrFail(events, rule.id, rule.name, sender, preview,
+                maxRetries, attempt, e.message ?: "io-error", null)
         }
     }
 
-    private fun retryOrFail(max: Int, reason: String): Result {
-        Log.w(TAG, "webhook failed: $reason (attempt=${runAttemptCount + 1}/$max)")
-        return if (runAttemptCount + 1 < max) Result.retry() else Result.failure()
+    private suspend fun retryOrFail(
+        events: `in`.dattam.smsforwarder.data.EventLogDao,
+        ruleId: Long, ruleName: String, sender: String, preview: String,
+        max: Int, attempt: Int, reason: String, httpCode: Int?,
+    ): Result {
+        Log.w(TAG, "FAIL $reason attempt=$attempt/$max rule=$ruleName")
+        val stage = if (attempt < max) "ENQUEUED" else "FAILED"
+        events.log(EventLog(stage = stage, sender = sender, bodyPreview = preview,
+            ruleId = ruleId, ruleName = ruleName, attempt = attempt,
+            httpCode = httpCode, detail = reason))
+        return if (attempt < max) Result.retry() else Result.failure()
     }
 
     private fun buildClient(ignoreSsl: Boolean): OkHttpClient {

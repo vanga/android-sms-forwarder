@@ -12,10 +12,11 @@ class EnumConverters {
     @TypeConverter fun toMode(v: String) = PatternMode.valueOf(v)
 }
 
-@Database(entities = [ForwardingRule::class], version = 1, exportSchema = false)
+@Database(entities = [ForwardingRule::class, EventLog::class], version = 2, exportSchema = false)
 @TypeConverters(EnumConverters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun ruleDao(): RuleDao
+    abstract fun eventLogDao(): EventLogDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
@@ -24,7 +25,10 @@ abstract class AppDatabase : RoomDatabase() {
                 ctx.applicationContext,
                 AppDatabase::class.java,
                 "smsforwarder.db"
-            ).build().also { instance = it }
+            )
+                .fallbackToDestructiveMigration(dropAllTables = true)
+                .build()
+                .also { instance = it }
         }
     }
 }

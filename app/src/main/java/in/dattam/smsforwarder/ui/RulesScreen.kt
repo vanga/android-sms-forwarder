@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -30,10 +31,23 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RulesScreen(onEdit: (Long?) -> Unit, vm: RulesViewModel = viewModel()) {
+fun RulesScreen(
+    onEdit: (Long?) -> Unit,
+    onOpenEvents: () -> Unit,
+    vm: RulesViewModel = viewModel(),
+) {
     val rules by vm.rules.collectAsStateWithLifecycle()
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Forwarding Rules") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Forwarding Rules") },
+                actions = {
+                    IconButton(onClick = onOpenEvents) {
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Events")
+                    }
+                },
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = { onEdit(null) }) {
                 Icon(Icons.Default.Add, contentDescription = "Add")
