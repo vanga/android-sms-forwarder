@@ -74,14 +74,13 @@ fun SettingsScreen(onDone: () -> Unit, vm: SettingsViewModel = viewModel()) {
             OutlinedTextField(
                 bodyTemplate, { bodyTemplate = it },
                 label = { Text("Default Body Template") },
-                placeholder = {
-                    Text(
-                        "Placeholders: %from% %text% %sentStamp% %receivedStamp% %sim%\n" +
-                            "Leave blank to send the built-in JSON payload."
-                    )
-                },
+                placeholder = { Text("Leave blank to send the built-in JSON payload.") },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
                 minLines = 5,
+            )
+            PlaceholderHelper(
+                onInsert = { bodyTemplate += it },
+                onInsertSample = { if (bodyTemplate.isBlank()) bodyTemplate = SAMPLE_BODY_TEMPLATE },
             )
             OutlinedTextField(
                 contentType, { contentType = it },

@@ -95,14 +95,13 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
             OutlinedTextField(
                 bodyTemplate, { bodyTemplate = it },
                 label = { Text("Body template (optional)") },
-                placeholder = {
-                    Text(
-                        "Leave blank for default JSON.\n" +
-                            "Placeholders: %from% %text% %sentStamp% %receivedStamp% %sim%"
-                    )
-                },
+                placeholder = { Text("Leave blank to use the default payload.") },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
                 minLines = 4,
+            )
+            PlaceholderHelper(
+                onInsert = { bodyTemplate += it },
+                onInsertSample = { if (bodyTemplate.isBlank()) bodyTemplate = SAMPLE_BODY_TEMPLATE },
             )
             OutlinedTextField(
                 contentType, { contentType = it },
