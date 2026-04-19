@@ -138,13 +138,21 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
     private fun httpClient(ignoreSsl: Boolean): OkHttpClient =
         if (ignoreSsl) trustingClient else secureClient
 
-    /** Rule headers override app defaults on key collision. */
+    /**
+     * Rule headers override app defaults on key collision — CASE-INSENSITIVELY,
+     * since HTTP header names are case-insensitive (RFC 7230). Without this,
+     * a default 'X-Api-Key' and a rule 'X-API-Key' would both be sent on the
+     * wire, and the server reads whichever it finds first — typically the
+     * default, which often still holds the placeholder 'replace-me' value.
+     */
     private fun mergeHeaders(defaultsJson: String, ruleJson: String): JsonObject {
         val defaults = runCatching { Json.decodeFromString<JsonObject>(defaultsJson) }
             .getOrDefault(JsonObject(emptyMap()))
         val rule = runCatching { Json.decodeFromString<JsonObject>(ruleJson) }
             .getOrDefault(JsonObject(emptyMap()))
-        return JsonObject(defaults.toMutableMap().apply { putAll(rule) })
+        val ruleKeysLower = rule.keys.map { it.lowercase() }.toSet()
+        val survivingDefaults = defaults.filterKeys { it.lowercase() !in ruleKeysLower }
+        return JsonObject(survivingDefaults + rule)
     }
 
     /**
