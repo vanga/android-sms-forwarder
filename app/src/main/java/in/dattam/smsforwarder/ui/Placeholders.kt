@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 
 val SAMPLE_HEADERS_JSON: String = """
 {
-  "X-SMS-Secret": "replace-with-your-shared-secret"
+  "X-Api-Key": "replace-with-your-shared-secret"
 }
 """.trimIndent()
 
