@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import `in`.dattam.smsforwarder.service.ForwardingService
 
 class MainActivity : ComponentActivity() {
 
@@ -28,6 +29,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Activity context = always foregrounded = always allowed to start the FGS.
+        ForwardingService.start(this)
         requestCorePermissions()
         requestBatteryOptExempt()
 

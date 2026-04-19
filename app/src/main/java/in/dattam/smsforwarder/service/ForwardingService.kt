@@ -58,10 +58,27 @@ class ForwardingService : Service() {
 
     companion object {
         private const val NOTIF_ID = 1
+        private const val TAG = "ForwardingService"
+
+        /**
+         * Start the foreground service. Safe to call from activities, boot
+         * receivers, and user-initiated flows. On API 31+ this can still
+         * throw ForegroundServiceStartNotAllowedException from background
+         * contexts (e.g. during a broadcast delivered to a reaped process);
+         * we swallow that exception so it never crashes the app — the next
+         * activity launch or SMS-triggered WorkManager job will carry on
+         * regardless.
+         */
         fun start(ctx: Context) {
             val i = Intent(ctx, ForwardingService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i)
-            else ctx.startService(i)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i)
+                else ctx.startService(i)
+            } catch (t: Throwable) {
+                // ForegroundServiceStartNotAllowedException (API 31+) is the
+                // expected case; catch broadly for forward-compat.
+                android.util.Log.w(TAG, "FGS start denied: ${t.javaClass.simpleName}: ${t.message}")
+            }
         }
     }
 }
