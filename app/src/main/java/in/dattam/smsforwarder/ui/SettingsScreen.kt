@@ -47,8 +47,8 @@ fun SettingsScreen(onDone: () -> Unit, vm: SettingsViewModel = viewModel()) {
 
     LaunchedEffect(Unit) {
         val d = vm.load()
-        headers = d.headersJson
-        bodyTemplate = d.bodyTemplate
+        headers = prettyJson(d.headersJson)
+        bodyTemplate = d.bodyTemplate.let { if (it.isBlank()) "" else prettyJson(it) }
         loaded = true
     }
 
@@ -74,6 +74,10 @@ fun SettingsScreen(onDone: () -> Unit, vm: SettingsViewModel = viewModel()) {
                 modifier = Modifier.fillMaxWidth().heightIn(min = 90.dp),
                 minLines = 3,
             )
+            androidx.compose.material3.TextButton(
+                onClick = { headers = prettyJson(headers) },
+                modifier = Modifier.align(androidx.compose.ui.Alignment.End),
+            ) { Text("Format JSON") }
             OutlinedTextField(
                 bodyTemplate, { bodyTemplate = it },
                 label = { Text("Default Body Template") },
@@ -81,6 +85,10 @@ fun SettingsScreen(onDone: () -> Unit, vm: SettingsViewModel = viewModel()) {
                 modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
                 minLines = 5,
             )
+            androidx.compose.material3.TextButton(
+                onClick = { bodyTemplate = prettyJson(bodyTemplate) },
+                modifier = Modifier.align(androidx.compose.ui.Alignment.End),
+            ) { Text("Format JSON") }
             PlaceholderHelper(onInsert = { bodyTemplate += it })
             Button(
                 onClick = {

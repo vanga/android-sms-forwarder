@@ -23,13 +23,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import `in`.dattam.smsforwarder.data.ForwardingRule
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewModel()) {
-    val existing = vm.rules.value.firstOrNull { it.id == ruleId }
+    // collectAsStateWithLifecycle subscribes Compose to the flow so a late
+    // emission from Room triggers recomposition and re-runs the hydration
+    // LaunchedEffect — vm.rules.value alone is a one-shot read that never
+    // updates when the DB finishes loading.
+    val rulesState by vm.rules.collectAsStateWithLifecycle()
+    val existing = rulesState.firstOrNull { it.id == ruleId }
 
     val isNew = ruleId <= 0
     var name by remember { mutableStateOf("") }
@@ -49,8 +55,9 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
         val e = existing
         if (!hydrated && e != null) {
             name = e.name; pattern = e.senderPattern
-            bodyPattern = e.bodyPattern.orEmpty(); url = e.url; headers = e.headersJson
-            bodyTemplate = e.bodyTemplate.orEmpty()
+            bodyPattern = e.bodyPattern.orEmpty(); url = e.url
+            headers = prettyJson(e.headersJson)
+            bodyTemplate = e.bodyTemplate?.let(::prettyJson).orEmpty()
             retries = e.retries.toString(); sim = e.simSlot.toString()
             hydrated = true
         }
@@ -112,8 +119,14 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
                             "Rule keys override defaults on collision."
                     )
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
+                minLines = 2,
             )
+            androidx.compose.material3.TextButton(
+                onClick = { headers = prettyJson(headers) },
+                modifier = Modifier.align(androidx.compose.ui.Alignment.End),
+            ) { Text("Format JSON") }
+
             OutlinedTextField(
                 bodyTemplate, { bodyTemplate = it },
                 label = { Text("Body template") },
@@ -121,6 +134,10 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
                 modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
                 minLines = 4,
             )
+            androidx.compose.material3.TextButton(
+                onClick = { bodyTemplate = prettyJson(bodyTemplate) },
+                modifier = Modifier.align(androidx.compose.ui.Alignment.End),
+            ) { Text("Format JSON") }
             PlaceholderHelper(onInsert = { bodyTemplate += it })
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
