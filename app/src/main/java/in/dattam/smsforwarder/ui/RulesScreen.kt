@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
@@ -75,6 +76,9 @@ fun RulesScreen(
                             Text(rule.url, style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
                         }
                         Switch(checked = rule.enabled, onCheckedChange = { vm.toggle(rule) })
+                        IconButton(onClick = { vm.sendTest(rule) }) {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send test")
+                        }
                         IconButton(onClick = { vm.delete(rule) }) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete")
                         }
