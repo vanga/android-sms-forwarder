@@ -114,24 +114,43 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         return JsonObject(defaults.toMutableMap().apply { putAll(rule) })
     }
 
+    /**
+     * Single-pass placeholder substitution. Scans the template once with a
+     * regex and resolves each match via lookup. Substituted content is never
+     * re-scanned, so an SMS body or sender that happens to contain a literal
+     * `%from%` / `%text%` / `%sim%` cannot be mistaken for a placeholder by
+     * a later substitution step.
+     *
+     * Values for %from% and %text% are JSON-escaped so embedded quotes,
+     * backslashes, and control chars don't break the JSON envelope when the
+     * placeholder sits inside a quoted JSON string. Timestamps are emitted
+     * as raw numeric literals (suitable for `"ts": %sentStamp%`).
+     */
     private fun substitute(
         template: String, from: String, text: String, sentTs: Long, recvTs: Long, sim: String,
     ): String {
-        val textEscaped = Json.encodeToString(kotlinx.serialization.json.JsonPrimitive.serializer(),
-            kotlinx.serialization.json.JsonPrimitive(text)).removeSurrounding("\"")
-        val fromEscaped = Json.encodeToString(kotlinx.serialization.json.JsonPrimitive.serializer(),
-            kotlinx.serialization.json.JsonPrimitive(from)).removeSurrounding("\"")
-        return template
-            .replace("%from%", fromEscaped)
-            .replace("%text%", textEscaped)
-            .replace("%sentStamp%", sentTs.toString())
-            .replace("%receivedStamp%", recvTs.toString())
-            .replace("%sim%", sim)
+        val values = mapOf(
+            "from" to jsonEscape(from),
+            "text" to jsonEscape(text),
+            "sentStamp" to sentTs.toString(),
+            "receivedStamp" to recvTs.toString(),
+            "sim" to sim,
+        )
+        return PLACEHOLDER.replace(template) { match ->
+            values[match.groupValues[1]] ?: match.value
+        }
     }
+
+    private fun jsonEscape(value: String): String =
+        Json.encodeToString(
+            kotlinx.serialization.json.JsonPrimitive.serializer(),
+            kotlinx.serialization.json.JsonPrimitive(value),
+        ).removeSurrounding("\"")
 
     companion object {
         private const val TAG = "WebhookWorker"
         private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
+        private val PLACEHOLDER = Regex("""%(from|text|sentStamp|receivedStamp|sim)%""")
         const val KEY_RULE_ID = "ruleId"
         const val KEY_SENDER = "sender"
         const val KEY_BODY = "body"
