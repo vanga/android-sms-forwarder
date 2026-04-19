@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.map
 data class AppDefaults(
     val headersJson: String,
     val bodyTemplate: String,
+    val mobileNumber: String,
 ) {
     companion object {
         const val DEFAULT_HEADERS_JSON = "{\n  \"X-Api-Key\": \"replace-with-your-shared-secret\"\n}"
@@ -25,6 +26,7 @@ class SettingsRepo(private val ctx: Context) {
     private object Keys {
         val HEADERS = stringPreferencesKey("default_headers_json")
         val BODY = stringPreferencesKey("default_body_template")
+        val MOBILE = stringPreferencesKey("default_mobile_number")
     }
 
     val flow: Flow<AppDefaults> = ctx.dataStore.data.map { p -> p.toDefaults() }
@@ -35,11 +37,13 @@ class SettingsRepo(private val ctx: Context) {
         ctx.dataStore.edit { p ->
             p[Keys.HEADERS] = d.headersJson
             p[Keys.BODY] = d.bodyTemplate
+            p[Keys.MOBILE] = d.mobileNumber
         }
     }
 
     private fun Preferences.toDefaults() = AppDefaults(
         headersJson = this[Keys.HEADERS] ?: AppDefaults.DEFAULT_HEADERS_JSON,
         bodyTemplate = this[Keys.BODY] ?: "",
+        mobileNumber = this[Keys.MOBILE] ?: "",
     )
 }

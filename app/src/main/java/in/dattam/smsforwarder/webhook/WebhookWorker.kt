@@ -61,7 +61,7 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         val effectiveTemplate = rule.bodyTemplate?.takeIf { it.isNotBlank() }
             ?: defaults.bodyTemplate.takeIf { it.isNotBlank() }
         val payload = effectiveTemplate
-            ?.let { substitute(it, sender, body, sentTs, recvTs, simLabel) }
+            ?.let { substitute(it, sender, body, sentTs, recvTs, simLabel, defaults.mobileNumber) }
             ?: buildJsonObject {
                 put("from", sender)
                 put("text", body)
@@ -168,7 +168,8 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
      * as raw numeric literals (suitable for `"ts": %sentStamp%`).
      */
     private fun substitute(
-        template: String, from: String, text: String, sentTs: Long, recvTs: Long, sim: String,
+        template: String, from: String, text: String, sentTs: Long, recvTs: Long,
+        sim: String, mobile: String,
     ): String {
         val values = mapOf(
             "from" to jsonEscape(from),
@@ -176,6 +177,7 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
             "sentStamp" to sentTs.toString(),
             "receivedStamp" to recvTs.toString(),
             "sim" to sim,
+            "mobile" to jsonEscape(mobile),
         )
         return PLACEHOLDER.replace(template) { match ->
             values[match.groupValues[1]] ?: match.value
@@ -191,7 +193,7 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
     companion object {
         private const val TAG = "WebhookWorker"
         private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
-        private val PLACEHOLDER = Regex("""%(from|text|sentStamp|receivedStamp|sim)%""")
+        private val PLACEHOLDER = Regex("""%(from|text|sentStamp|receivedStamp|sim|mobile)%""")
         const val KEY_RULE_ID = "ruleId"
         const val KEY_SENDER = "sender"
         const val KEY_BODY = "body"

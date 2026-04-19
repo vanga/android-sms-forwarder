@@ -11,6 +11,17 @@ interface EventLogDao {
     @Query("SELECT * FROM event_log ORDER BY id DESC LIMIT :limit")
     fun observeRecent(limit: Int = 500): Flow<List<EventLog>>
 
+    /**
+     * Most recent event per ruleId. Used to show a status chip on each rule row
+     * at-a-glance. Returns at most one row per rule, null-ruleId events excluded.
+     */
+    @Query("""
+        SELECT e.* FROM event_log e
+        INNER JOIN (SELECT ruleId, MAX(id) mid FROM event_log WHERE ruleId IS NOT NULL GROUP BY ruleId) m
+          ON e.id = m.mid
+    """)
+    fun observeLatestPerRule(): Flow<List<EventLog>>
+
     @Insert
     suspend fun insert(event: EventLog): Long
 

@@ -29,7 +29,7 @@ val SAMPLE_BODY_TEMPLATE: String = """
   "time": "%receivedStamp%",
   "receivedStamp": %receivedStamp%,
   "sim": "%sim%",
-  "mobile": "replace-with-10-digit-number"
+  "mobile": "%mobile%"
 }
 """.trimIndent()
 
@@ -39,6 +39,7 @@ private val PLACEHOLDERS = listOf(
     "%sentStamp%" to "epoch ms, from network",
     "%receivedStamp%" to "epoch ms, when phone got it",
     "%sim%" to "sim1 / sim2 / undetected",
+    "%mobile%" to "this phone's number (from Defaults)",
 )
 
 /** Chips that append a placeholder to the target field on tap, plus a doc list. */
