@@ -19,6 +19,7 @@
         android:allowBackup="false"
         android:enableOnBackInvokedCallback="true"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
         android:theme="@style/Theme.SmsForwarder">
 
         <activity
