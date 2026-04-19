@@ -15,7 +15,7 @@ data class AppDefaults(
     val bodyTemplate: String,
 ) {
     companion object {
-        const val DEFAULT_HEADERS_JSON = "{\n  \"X-Api-Key\": \"replace-with-your-shared-secret\"\n}"
+        const val DEFAULT_HEADERS_JSON = "{\n  \"X-SMS-Secret\": \"replace-with-your-shared-secret\"\n}"
     }
 }
 

@@ -13,17 +13,23 @@ import androidx.compose.ui.unit.dp
 
 val SAMPLE_HEADERS_JSON: String = """
 {
-  "X-Api-Key": "replace-with-your-shared-secret"
+  "X-SMS-Secret": "replace-with-your-shared-secret"
 }
 """.trimIndent()
 
+/**
+ * Body shape expected by the OTP-receiver API that this app is paired with.
+ * `mobile` is the receiving SIM's 10-digit number — hardcode it per rule so
+ * the server can route the OTP to the right scraper-phone pool entry.
+ */
 val SAMPLE_BODY_TEMPLATE: String = """
 {
+  "message": "%text%",
   "from": "%from%",
-  "text": "%text%",
-  "sentStamp": %sentStamp%,
+  "time": "%receivedStamp%",
   "receivedStamp": %receivedStamp%,
-  "sim": "%sim%"
+  "sim": "%sim%",
+  "mobile": "replace-with-10-digit-number"
 }
 """.trimIndent()
 
