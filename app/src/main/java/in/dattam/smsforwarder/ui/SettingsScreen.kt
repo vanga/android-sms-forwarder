@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -63,14 +64,12 @@ fun SettingsScreen(onDone: () -> Unit, vm: SettingsViewModel = viewModel()) {
         headers = prettyJson(d.headersJson)
         bodyTemplate = d.bodyTemplate.let { if (it.isBlank()) SAMPLE_BODY_TEMPLATE else prettyJson(it) }
         mobile = d.mobileNumber
-        // Auto-populate mobile from SIM if user hasn't set one yet.
+        // Auto-populate mobile from SIM if user hasn't set one yet. Indian
+        // carriers often leave this empty on the SIM — user just types it.
         if (mobile.isBlank()) {
-            val detected = SimHelper.readMobileNumber(ctx)
-            if (!detected.isNullOrBlank()) {
-                mobile = detected
-                simHint = "Auto-detected from SIM. Edit if wrong, then Save."
-            } else {
-                simHint = "SIM didn't expose the number (common on Indian carriers). Enter manually."
+            SimHelper.readMobileNumber(ctx)?.takeIf { it.isNotBlank() }?.let {
+                mobile = it
+                simHint = "Auto-filled from SIM — edit if wrong."
             }
         }
         loaded = true
@@ -93,30 +92,26 @@ fun SettingsScreen(onDone: () -> Unit, vm: SettingsViewModel = viewModel()) {
                     "Good for auth tokens, a shared body template, and the device's phone number.",
             )
 
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                OutlinedTextField(
-                    mobile,
-                    { mobile = it.filter(Char::isDigit).take(10) },
-                    label = { Text("This phone's mobile number") },
-                    placeholder = { Text("10 digits, no country code") },
-                    supportingText = { simHint?.let { Text(it) } },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(onClick = {
-                    val n = SimHelper.readMobileNumber(ctx)
-                    if (!n.isNullOrBlank()) {
-                        mobile = n
-                        simHint = "Filled from SIM."
-                    } else {
-                        simHint = "SIM didn't return a number."
+            OutlinedTextField(
+                mobile,
+                { mobile = it.filter(Char::isDigit).take(10) },
+                label = { Text("This phone's mobile number *") },
+                placeholder = { Text("10 digits, no country code") },
+                supportingText = {
+                    val isValid = mobile.length == 10
+                    when {
+                        !isValid -> Text(
+                            "Required. Enter 10 digits.",
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        simHint != null -> Text(simHint!!)
+                        else -> Text("Used by the %mobile% placeholder in body templates.")
                     }
-                }) { Text("Read SIM") }
-            }
+                },
+                isError = mobile.isNotEmpty() && mobile.length != 10,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                modifier = Modifier.fillMaxWidth(),
+            )
 
             OutlinedTextField(
                 headers, { headers = it },
@@ -159,6 +154,7 @@ fun SettingsScreen(onDone: () -> Unit, vm: SettingsViewModel = viewModel()) {
                         onDone,
                     )
                 },
+                enabled = mobile.length == 10,
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Save") }
         }
