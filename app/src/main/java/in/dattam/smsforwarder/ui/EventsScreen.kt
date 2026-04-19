@@ -97,11 +97,12 @@ private fun EventRow(e: EventLog, fmt: SimpleDateFormat) {
 }
 
 private fun colorForStage(stage: String): Color = when (stage) {
-    "POSTED" -> Color(0xFF2E7D32)
-    "FAILED" -> Color(0xFFB00020)
-    "SKIPPED" -> Color(0xFF757575)
-    "MATCHED", "ENQUEUED" -> Color(0xFF1565C0)
-    "RECEIVED" -> Color(0xFF5E35B1)
+    "POSTED" -> Color(0xFF2E7D32)     // green
+    "FAILED" -> Color(0xFFB00020)     // red
+    "RETRYING" -> Color(0xFFE65100)   // orange — retry in flight
+    "SKIPPED" -> Color(0xFF757575)    // grey
+    "MATCHED", "ENQUEUED" -> Color(0xFF1565C0)  // blue
+    "RECEIVED" -> Color(0xFF5E35B1)   // purple
     else -> Color.Unspecified
 }
 

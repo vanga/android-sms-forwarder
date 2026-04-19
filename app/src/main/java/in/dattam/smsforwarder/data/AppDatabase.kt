@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package `in`.dattam.smsforwarder.data
 
 import android.content.Context
@@ -14,7 +16,7 @@ class EnumConverters {
     @TypeConverter fun toMode(v: String) = PatternMode.valueOf(v)
 }
 
-@Database(entities = [ForwardingRule::class, EventLog::class], version = 3, exportSchema = false)
+@Database(entities = [ForwardingRule::class, EventLog::class], version = 3, exportSchema = true)
 @TypeConverters(EnumConverters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun ruleDao(): RuleDao
@@ -25,7 +27,7 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     """
-                    CREATE TABLE IF NOT EXISTS event_log (
+                    CREATE TABLE event_log (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         ts INTEGER NOT NULL,
                         stage TEXT NOT NULL,

@@ -30,6 +30,12 @@ android {
     kotlin { jvmToolchain(17) }
     buildFeatures { compose = true }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+
+    // Room schema export location — committed under app/schemas/ so migrations
+    // can be validated in MigrationTestHelper tests later.
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
 }
 
 dependencies {

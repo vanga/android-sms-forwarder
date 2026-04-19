@@ -9,6 +9,7 @@ import `in`.dattam.smsforwarder.data.EventLog
 import `in`.dattam.smsforwarder.data.SettingsRepo
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
@@ -37,11 +38,17 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         val db = AppDatabase.get(applicationContext)
         val events = db.eventLogDao()
 
-        val rule = db.ruleDao().allEnabled().firstOrNull { it.id == ruleId } ?: run {
+        val rule = db.ruleDao().byId(ruleId) ?: run {
             Log.w(TAG, "rule $ruleId no longer exists; dropping")
             events.log(EventLog(stage = "FAILED", sender = sender, bodyPreview = preview,
                 ruleId = ruleId, attempt = attempt, detail = "rule deleted"))
             return Result.failure()
+        }
+        if (!rule.enabled) {
+            Log.i(TAG, "rule ${rule.id} disabled; skipping in-flight delivery")
+            events.log(EventLog(stage = "SKIPPED", sender = sender, bodyPreview = preview,
+                ruleId = rule.id, ruleName = rule.name, detail = "rule disabled"))
+            return Result.success()
         }
 
         Log.i(TAG, "POST rule='${rule.name}' url=${rule.url} attempt=$attempt/$maxRetries")
@@ -65,22 +72,43 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
 
         val mergedHeaders = mergeHeaders(defaults.headersJson, rule.headersJson)
 
-        return try {
-            val client = httpClient(rule.ignoreSsl)
+        val request = try {
             val reqBuilder = Request.Builder()
                 .url(rule.url)
                 .post(payload.toRequestBody(JSON_MEDIA))
-            mergedHeaders.forEach { (k, v) -> reqBuilder.addHeader(k, v.toString().trim('"')) }
+            mergedHeaders.forEach { (k, v) -> reqBuilder.addHeader(k, headerValue(v)) }
+            reqBuilder.build()
+        } catch (t: IllegalArgumentException) {
+            // Malformed URL, invalid header char, etc. Deterministic — no point retrying.
+            Log.e(TAG, "invalid request for rule ${rule.id}: ${t.message}")
+            events.log(EventLog(stage = "FAILED", sender = sender, bodyPreview = preview,
+                ruleId = rule.id, ruleName = rule.name, attempt = attempt,
+                detail = "invalid request: ${t.message}"))
+            return Result.failure()
+        }
 
-            client.newCall(reqBuilder.build()).execute().use { resp ->
-                if (resp.isSuccessful) {
-                    Log.i(TAG, "POSTED ${resp.code} rule='${rule.name}'")
-                    events.log(EventLog(stage = "POSTED", sender = sender, bodyPreview = preview,
-                        ruleId = rule.id, ruleName = rule.name, httpCode = resp.code, attempt = attempt))
-                    Result.success()
-                } else {
-                    retryOrFail(events, rule.id, rule.name, sender, preview,
-                        maxRetries, attempt, "HTTP ${resp.code}", resp.code)
+        return try {
+            httpClient(rule.ignoreSsl).newCall(request).execute().use { resp ->
+                when {
+                    resp.isSuccessful -> {
+                        Log.i(TAG, "POSTED ${resp.code} rule='${rule.name}'")
+                        events.log(EventLog(stage = "POSTED", sender = sender, bodyPreview = preview,
+                            ruleId = rule.id, ruleName = rule.name, httpCode = resp.code, attempt = attempt))
+                        Result.success()
+                    }
+                    // Retry only on 5xx + 408 (request timeout) + 429 (rate limited).
+                    // 4xx otherwise is a deterministic client/config error; retrying wastes
+                    // attempts and drowns the event log during OTP's short validity window.
+                    resp.code in 500..599 || resp.code == 408 || resp.code == 429 ->
+                        retryOrFail(events, rule.id, rule.name, sender, preview,
+                            maxRetries, attempt, "HTTP ${resp.code}", resp.code)
+                    else -> {
+                        Log.w(TAG, "FAIL HTTP ${resp.code} (no-retry) rule=${rule.name}")
+                        events.log(EventLog(stage = "FAILED", sender = sender, bodyPreview = preview,
+                            ruleId = rule.id, ruleName = rule.name, httpCode = resp.code, attempt = attempt,
+                            detail = "HTTP ${resp.code} (client error, not retried)"))
+                        Result.failure()
+                    }
                 }
             }
         } catch (e: IOException) {
@@ -95,12 +123,17 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         max: Int, attempt: Int, reason: String, httpCode: Int?,
     ): Result {
         Log.w(TAG, "FAIL $reason attempt=$attempt/$max rule=$ruleName")
-        val stage = if (attempt < max) "ENQUEUED" else "FAILED"
+        val willRetry = attempt < max
+        val stage = if (willRetry) "RETRYING" else "FAILED"
         events.log(EventLog(stage = stage, sender = sender, bodyPreview = preview,
             ruleId = ruleId, ruleName = ruleName, attempt = attempt,
             httpCode = httpCode, detail = reason))
-        return if (attempt < max) Result.retry() else Result.failure()
+        return if (willRetry) Result.retry() else Result.failure()
     }
+
+    /** Coerce a JsonElement header value to a plain string suitable for HTTP headers. */
+    private fun headerValue(v: kotlinx.serialization.json.JsonElement): String =
+        (v as? JsonPrimitive)?.content ?: v.toString()
 
     private fun httpClient(ignoreSsl: Boolean): OkHttpClient =
         if (ignoreSsl) trustingClient else secureClient

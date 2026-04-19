@@ -7,6 +7,12 @@ import `in`.dattam.smsforwarder.service.ForwardingService
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        ForwardingService.start(context)
+        // Guard against rogue explicit intents from other apps — only act on the
+        // three broadcasts we registered for in the manifest.
+        when (intent.action) {
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_LOCKED_BOOT_COMPLETED,
+            Intent.ACTION_MY_PACKAGE_REPLACED -> ForwardingService.start(context)
+        }
     }
 }

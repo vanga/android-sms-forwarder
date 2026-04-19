@@ -13,7 +13,11 @@ import kotlinx.coroutines.flow.map
 data class AppDefaults(
     val headersJson: String,
     val bodyTemplate: String,
-)
+) {
+    companion object {
+        const val DEFAULT_HEADERS_JSON = "{\n  \"X-Api-Key\": \"replace-with-your-shared-secret\"\n}"
+    }
+}
 
 private val Context.dataStore by preferencesDataStore(name = "app_defaults")
 
@@ -35,7 +39,7 @@ class SettingsRepo(private val ctx: Context) {
     }
 
     private fun Preferences.toDefaults() = AppDefaults(
-        headersJson = this[Keys.HEADERS] ?: "{}",
+        headersJson = this[Keys.HEADERS] ?: AppDefaults.DEFAULT_HEADERS_JSON,
         bodyTemplate = this[Keys.BODY] ?: "",
     )
 }

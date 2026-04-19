@@ -16,6 +16,9 @@ interface RuleDao {
     @Query("SELECT * FROM forwarding_rules WHERE enabled = 1")
     suspend fun allEnabled(): List<ForwardingRule>
 
+    @Query("SELECT * FROM forwarding_rules WHERE id = :id")
+    suspend fun byId(id: Long): ForwardingRule?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(rule: ForwardingRule): Long
 

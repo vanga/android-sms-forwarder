@@ -40,14 +40,29 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
     var bodyTemplate by remember { mutableStateOf(if (isNew) SAMPLE_BODY_TEMPLATE else "") }
     var retries by remember { mutableStateOf("10") }
     var sim by remember { mutableStateOf("0") }
+    var hydrated by remember { mutableStateOf(isNew) }
 
+    // Only hydrate once from the first non-null emission of the rule list;
+    // subsequent emissions (e.g. another rule toggle while the editor is open)
+    // would otherwise overwrite in-progress user edits.
     LaunchedEffect(existing?.id) {
-        existing?.let {
-            name = it.name; pattern = it.senderPattern
-            bodyPattern = it.bodyPattern.orEmpty(); url = it.url; headers = it.headersJson
-            bodyTemplate = it.bodyTemplate.orEmpty()
-            retries = it.retries.toString(); sim = it.simSlot.toString()
+        val e = existing
+        if (!hydrated && e != null) {
+            name = e.name; pattern = e.senderPattern
+            bodyPattern = e.bodyPattern.orEmpty(); url = e.url; headers = e.headersJson
+            bodyTemplate = e.bodyTemplate.orEmpty()
+            retries = e.retries.toString(); sim = e.simSlot.toString()
+            hydrated = true
         }
+    }
+
+    // Live regex validation — show which lines won't compile.
+    val badLines = remember(pattern) {
+        pattern.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && it != "*" }
+            .filter { line -> runCatching { Regex(line) }.isFailure }
+            .toList()
     }
 
     Scaffold(topBar = { TopAppBar(title = { Text(if (ruleId > 0) "Edit Rule" else "New Rule") }) }) { pad ->
@@ -61,12 +76,20 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
             OutlinedTextField(
                 pattern, { pattern = it },
                 label = { Text("Sender patterns (one per line, OR)") },
+                isError = badLines.isNotEmpty(),
                 supportingText = {
-                    Text(
-                        "Each line is a Java regex, anchored (whole-string match). " +
-                            "Plain strings match themselves exactly. Use .* for wildcard, " +
-                            ".*-GOV-.* for substring."
-                    )
+                    if (badLines.isEmpty()) {
+                        Text(
+                            "Each line is a Java regex, anchored (whole-string match). " +
+                                "Plain strings match themselves exactly. Use .* for wildcard, " +
+                                ".*-GOV-.* for substring."
+                        )
+                    } else {
+                        Text(
+                            "Invalid regex on ${badLines.size} line(s): " +
+                                badLines.joinToString(", ") { "'$it'" }
+                        )
+                    }
                 },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
                 minLines = 3,
@@ -101,12 +124,25 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
             PlaceholderHelper(onInsert = { bodyTemplate += it })
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(retries, { retries = it.filter(Char::isDigit) }, label = { Text("Retries") }, modifier = Modifier.weight(1f))
-                OutlinedTextField(sim, { sim = it.filter(Char::isDigit) }, label = { Text("SIM (0=any)") }, modifier = Modifier.weight(1f))
+                OutlinedTextField(
+                    retries,
+                    { retries = it.filter(Char::isDigit).take(2) },
+                    label = { Text("Max attempts (1-20)") },
+                    supportingText = { Text("1 means no retry.") },
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    sim,
+                    { sim = it.filter(Char::isDigit).take(1) },
+                    label = { Text("SIM 0=any, 1, 2") },
+                    modifier = Modifier.weight(1f),
+                )
             }
 
             Button(
                 onClick = {
+                    val clampedRetries = (retries.toIntOrNull() ?: 10).coerceIn(1, 20)
+                    val clampedSim = (sim.toIntOrNull() ?: 0).coerceIn(0, 2)
                     val rule = (existing ?: ForwardingRule(name = "", senderPattern = "", url = "")).copy(
                         name = name.ifBlank { pattern.lineSequence().firstOrNull()?.trim().orEmpty() },
                         senderPattern = pattern,
@@ -114,12 +150,12 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
                         url = url,
                         headersJson = headers.ifBlank { "{}" },
                         bodyTemplate = bodyTemplate.ifBlank { null },
-                        retries = retries.toIntOrNull() ?: 10,
-                        simSlot = sim.toIntOrNull() ?: 0,
+                        retries = clampedRetries,
+                        simSlot = clampedSim,
                     )
                     vm.upsert(rule); onDone()
                 },
-                enabled = url.isNotBlank() && pattern.isNotBlank(),
+                enabled = url.isNotBlank() && pattern.isNotBlank() && badLines.isEmpty(),
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Save") }
         }

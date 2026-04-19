@@ -46,8 +46,12 @@ class SmsDispatchWorker(ctx: Context, params: WorkerParameters) : CoroutineWorke
             }
 
             var matched = 0
+            val slotUnknown = slotId == 0
             for (rule in rules) {
-                if (rule.simSlot != 0 && rule.simSlot != slotId) {
+                // slotId 0 means detection failed (undetected). Don't use it to exclude
+                // SIM-scoped rules — a failed detection shouldn't silently drop every
+                // OTP on devices with OEM bundle-key variants we don't recognise.
+                if (!slotUnknown && rule.simSlot != 0 && rule.simSlot != slotId) {
                     Log.d(TAG, "rule '${rule.name}' skipped: sim ${rule.simSlot} != $slotId")
                     continue
                 }
