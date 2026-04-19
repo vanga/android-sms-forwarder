@@ -17,10 +17,34 @@ android {
         versionName = "0.1.0"
     }
 
+    // Pull release-signing creds from ~/.gradle/gradle.properties (never committed).
+    // If the props are absent (e.g. CI / fresh clone without signing setup), release
+    // builds fall through unsigned and the developer gets a clear "signing not configured"
+    // error rather than a broken key.
+    val keystoreFile = findProperty("SMS_FORWARDER_KEYSTORE") as String?
+    val keyAlias0 = findProperty("SMS_FORWARDER_KEY_ALIAS") as String?
+    val storePw = findProperty("SMS_FORWARDER_STORE_PASSWORD") as String?
+    val keyPw = findProperty("SMS_FORWARDER_KEY_PASSWORD") as String?
+    val canSignRelease = keystoreFile != null && keyAlias0 != null && storePw != null && keyPw != null
+
+    signingConfigs {
+        if (canSignRelease) {
+            create("release") {
+                storeFile = file(keystoreFile!!)
+                keyAlias = keyAlias0
+                storePassword = storePw
+                keyPassword = keyPw
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (canSignRelease) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {

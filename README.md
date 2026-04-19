@@ -62,4 +62,7 @@ Silent SMS drops on Android are almost never a code bug — they're OEM aggressi
 
 ## Credits
 
-SIM-slot detection and the general webhook+retry approach ported from [bogkonstantin/android_income_sms_gateway_webhook](https://github.com/bogkonstantin/android_income_sms_gateway_webhook) (MIT). Everything else is a Kotlin/Compose rewrite.
+Dual-SIM bundle-key detection empirically collected by
+[bogkonstantin/android_income_sms_gateway_webhook](https://github.com/bogkonstantin/android_income_sms_gateway_webhook)
+(MIT) — the list in `SimSlotDetector` is ported from that project.
+The rest is a fresh Kotlin/Compose/WorkManager implementation.
