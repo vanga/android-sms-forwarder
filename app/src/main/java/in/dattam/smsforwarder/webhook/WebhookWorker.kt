@@ -66,7 +66,7 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         val mergedHeaders = mergeHeaders(defaults.headersJson, rule.headersJson)
 
         return try {
-            val client = buildClient(rule.ignoreSsl)
+            val client = httpClient(rule.ignoreSsl)
             val reqBuilder = Request.Builder()
                 .url(rule.url)
                 .post(payload.toRequestBody(JSON_MEDIA))
@@ -102,22 +102,8 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         return if (attempt < max) Result.retry() else Result.failure()
     }
 
-    private fun buildClient(ignoreSsl: Boolean): OkHttpClient {
-        val b = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-        if (ignoreSsl) {
-            val tm = object : X509TrustManager {
-                override fun checkClientTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
-                override fun checkServerTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
-                override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = emptyArray()
-            }
-            val sc = SSLContext.getInstance("TLS").apply { init(null, arrayOf(tm), java.security.SecureRandom()) }
-            b.sslSocketFactory(sc.socketFactory, tm)
-            b.hostnameVerifier(HostnameVerifier { _, _ -> true })
-        }
-        return b.build()
-    }
+    private fun httpClient(ignoreSsl: Boolean): OkHttpClient =
+        if (ignoreSsl) trustingClient else secureClient
 
     /** Rule headers override app defaults on key collision. */
     private fun mergeHeaders(defaultsJson: String, ruleJson: String): JsonObject {
@@ -153,5 +139,44 @@ class WebhookWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         const val KEY_SENT_TS = "sentTs"
         const val KEY_RECV_TS = "recvTs"
         const val KEY_MAX_RETRIES = "maxRetries"
+
+        /**
+         * Shared OkHttpClient for standard TLS. Singleton so retries and
+         * concurrent workers reuse one connection pool + dispatcher instead
+         * of allocating a fresh thread pool per invocation.
+         *
+         * callTimeout is a hard ceiling covering connect + write + read so a
+         * slow server can never hang the worker past this bound.
+         */
+        private val secureClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .writeTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .callTimeout(45, TimeUnit.SECONDS)
+                .build()
+        }
+
+        /**
+         * Singleton client used ONLY when a rule opts into ignoreSsl. Trust
+         * is fully nullified — per-rule opt-in acknowledged as a deliberate
+         * bypass for internal/self-signed endpoints.
+         */
+        private val trustingClient: OkHttpClient by lazy {
+            val tm = object : X509TrustManager {
+                override fun checkClientTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
+                override fun checkServerTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
+                override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = emptyArray()
+            }
+            val sc = SSLContext.getInstance("TLS").apply { init(null, arrayOf(tm), java.security.SecureRandom()) }
+            OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .writeTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .callTimeout(45, TimeUnit.SECONDS)
+                .sslSocketFactory(sc.socketFactory, tm)
+                .hostnameVerifier(HostnameVerifier { _, _ -> true })
+                .build()
+        }
     }
 }

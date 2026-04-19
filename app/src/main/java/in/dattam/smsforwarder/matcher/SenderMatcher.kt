@@ -25,6 +25,9 @@ object SenderMatcher {
             .filter { it.isNotEmpty() }
             .toList()
         if (lines.isEmpty()) return true
+        // Convenience: a bare "*" is an invalid regex, but users intuitively read it
+        // as "match everything". Treat it as such.
+        if (lines.any { it == "*" }) return true
         return lines.any { line ->
             runCatching {
                 Regex(line, RegexOption.IGNORE_CASE).matches(sender)
