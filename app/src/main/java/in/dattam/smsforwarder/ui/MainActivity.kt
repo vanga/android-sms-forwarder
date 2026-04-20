@@ -41,14 +41,24 @@ class MainActivity : ComponentActivity() {
                     NavHost(nav, startDestination = "rules") {
                         composable("rules") {
                             RulesScreen(
-                                onEdit = { nav.navigate("edit/${it ?: -1L}") },
+                                onEdit = { id, clone ->
+                                    val route = when {
+                                        clone && id != null -> "clone/$id"
+                                        else -> "edit/${id ?: -1L}"
+                                    }
+                                    nav.navigate(route)
+                                },
                                 onOpenEvents = { nav.navigate("events") },
                                 onOpenSettings = { nav.navigate("settings") },
                             )
                         }
                         composable("edit/{id}") { backStack ->
                             val id = backStack.arguments?.getString("id")?.toLongOrNull() ?: -1L
-                            RuleEditScreen(ruleId = id, onDone = { nav.popBackStack() })
+                            RuleEditScreen(ruleId = id, cloneFromRuleId = null, onDone = { nav.popBackStack() })
+                        }
+                        composable("clone/{id}") { backStack ->
+                            val id = backStack.arguments?.getString("id")?.toLongOrNull() ?: -1L
+                            RuleEditScreen(ruleId = -1L, cloneFromRuleId = id, onDone = { nav.popBackStack() })
                         }
                         composable("events") { EventsScreen() }
                         composable("settings") { SettingsScreen(onDone = { nav.popBackStack() }) }

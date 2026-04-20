@@ -42,9 +42,10 @@ class RulesViewModel(app: Application) : AndroidViewModel(app) {
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val messages = _messages.asSharedFlow()
 
-    fun upsert(rule: ForwardingRule) = viewModelScope.launch {
-        dao.upsert(rule)
+    fun upsert(rule: ForwardingRule, onSaved: (Long) -> Unit = {}) = viewModelScope.launch {
+        val savedId = dao.upsert(rule)
         _messages.emit(if (rule.id > 0) "Rule updated" else "Rule created")
+        onSaved(if (rule.id > 0) rule.id else savedId)
     }
 
     fun delete(rule: ForwardingRule) = viewModelScope.launch {

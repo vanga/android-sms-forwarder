@@ -2,7 +2,7 @@
 
 Android app that forwards incoming SMS to a webhook as JSON. Built for automating gov-document scraping flows that gate behind OTPs delivered to a phone.
 
-Kotlin + Jetpack Compose + Room + WorkManager. Min SDK 26, target 35.
+Kotlin + Jetpack Compose + Room + WorkManager. Min SDK 26, target 36.
 
 ## Features
 
@@ -13,6 +13,8 @@ Kotlin + Jetpack Compose + Room + WorkManager. Min SDK 26, target 35.
 - **Dual-SIM aware.** Per-rule SIM filter; slot detection uses the empirically collected bundle-key list from bogkonstantin/android_income_sms_gateway_webhook.
 - **Exponential retry via WorkManager** with configurable max retries per rule.
 - **Self-signed cert bypass** toggle for internal endpoints.
+- **Rule cloning and save-and-test flows** for faster setup and iteration.
+- **Filterable event log** so you can inspect activity per rule.
 
 ## Payload
 
@@ -32,18 +34,7 @@ Custom headers (JSON object) are sent alongside the POST.
 
 ## Build
 
-Requires JDK 17+ and Android SDK with API 36 installed. Gradle wrapper is pinned to 9.4.1 in `gradle/wrapper/gradle-wrapper.properties`, but the `gradlew` script + wrapper jar aren't checked in.
-
-One-time setup (pick one):
-
-```bash
-# Option A: install gradle, generate wrapper
-brew install gradle
-gradle wrapper --gradle-version 9.4.1
-
-# Option B: open project in Android Studio (Koala Feature Drop / 2026.1+)
-# — it will generate the wrapper on first sync.
-```
+Requires JDK 17+ and Android SDK with API 36 installed. The Gradle wrapper is checked in and pinned to 9.4.1 in `gradle/wrapper/gradle-wrapper.properties`.
 
 Then:
 

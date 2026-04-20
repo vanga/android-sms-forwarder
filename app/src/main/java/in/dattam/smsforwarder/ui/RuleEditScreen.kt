@@ -1,7 +1,6 @@
 package `in`.dattam.smsforwarder.ui
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,11 +11,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -41,13 +42,22 @@ import `in`.dattam.smsforwarder.data.ForwardingRule
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewModel()) {
+fun RuleEditScreen(
+    ruleId: Long,
+    cloneFromRuleId: Long? = null,
+    onDone: () -> Unit,
+    vm: RulesViewModel = viewModel(),
+) {
+    var currentRuleId by remember(ruleId) { mutableStateOf(ruleId) }
+    var currentCloneSourceId by remember(cloneFromRuleId) { mutableStateOf(cloneFromRuleId) }
     val rulesState by vm.rules.collectAsStateWithLifecycle()
-    val existing = rulesState.firstOrNull { it.id == ruleId }
+    val existing = rulesState.firstOrNull { it.id == currentRuleId }
+    val cloneSource = rulesState.firstOrNull { it.id == currentCloneSourceId }
     val testingId by vm.testing.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
 
-    val isNew = ruleId <= 0
+    val isClone = cloneSource != null
+    val isNew = currentRuleId <= 0 || isClone
     var name by remember { mutableStateOf("") }
     var pattern by remember { mutableStateOf(if (isNew) ".*-GOV-.*" else "") }
     var bodyPattern by remember { mutableStateOf("") }
@@ -56,19 +66,22 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
     var bodyTemplate by remember { mutableStateOf(if (isNew) SAMPLE_BODY_TEMPLATE else "") }
     var retries by remember { mutableStateOf("10") }
     var sim by remember { mutableStateOf("0") }
-    var hydrated by remember { mutableStateOf(isNew) }
+    var hydrated by remember { mutableStateOf(false) }
     var dirty by remember { mutableStateOf(isNew) }
 
-    LaunchedEffect(existing?.id) {
-        val e = existing
+    LaunchedEffect(existing?.id, cloneSource?.id) {
+        val e = cloneSource ?: existing
         if (!hydrated && e != null) {
-            name = e.name; pattern = e.senderPattern
+            name = if (isClone) "${e.name} (copy)" else e.name
+            pattern = e.senderPattern
             bodyPattern = e.bodyPattern.orEmpty(); url = e.url
             headers = prettyJson(e.headersJson)
             bodyTemplate = e.bodyTemplate?.let(::prettyJson).orEmpty()
             retries = e.retries.toString(); sim = e.simSlot.toString()
             hydrated = true
-            dirty = false
+            dirty = isClone
+        } else if (!hydrated && isNew && e == null) {
+            hydrated = true
         }
     }
 
@@ -83,13 +96,18 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
             .filter { line -> runCatching { Regex(line) }.isFailure }
             .toList()
     }
-    val isTesting = testingId != null && testingId == ruleId
+    val isTesting = testingId != null && testingId == currentRuleId
     val canSave = url.isNotBlank() && pattern.isNotBlank() && badLines.isEmpty()
 
     fun buildRule(): ForwardingRule {
         val clampedRetries = (retries.toIntOrNull() ?: 10).coerceIn(1, 20)
         val clampedSim = (sim.toIntOrNull() ?: 0).coerceIn(0, 2)
-        return (existing ?: ForwardingRule(name = "", senderPattern = "", url = "")).copy(
+        val baseRule = if (isClone) {
+            cloneSource.copy(id = 0)
+        } else {
+            existing
+        } ?: ForwardingRule(name = "", senderPattern = "", url = "")
+        return baseRule.copy(
             name = name.ifBlank { pattern.lineSequence().firstOrNull()?.trim().orEmpty() },
             senderPattern = pattern,
             bodyPattern = bodyPattern.ifBlank { null },
@@ -102,7 +120,24 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text(if (ruleId > 0) "Edit Rule" else "New Rule") }) },
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        when {
+                            isClone -> "Clone Rule"
+                            currentRuleId > 0 -> "Edit Rule"
+                            else -> "New Rule"
+                        }
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onDone) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+            )
+        },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { pad ->
         Column(
@@ -199,12 +234,12 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
 
             Spacer(Modifier.size(8.dp))
 
-            // Test button tests the *saved* version of the rule. If the user has
-            // unsaved edits the button is disabled with a hint — forcing Save
-            // first avoids the surprise of "I changed the URL but test used the
-            // old one".
+            // Manual test still targets the currently saved rule. The primary
+            // action below handles the common "save current draft, then test it"
+            // flow in one step.
             val canTest = existing != null && !dirty && !isTesting && canSave
             val testHint = when {
+                isClone -> "Save the cloned rule once to enable Test."
                 existing == null -> "Save the rule once to enable Test."
                 dirty -> "Save to test current edits."
                 else -> null
@@ -233,10 +268,42 @@ fun RuleEditScreen(ruleId: Long, onDone: () -> Unit, vm: RulesViewModel = viewMo
             }
 
             Button(
-                onClick = { vm.upsert(buildRule()); onDone() },
-                enabled = canSave,
+                onClick = {
+                    if (existing != null && !dirty) {
+                        vm.sendTest(existing)
+                    } else {
+                        val draft = buildRule()
+                        vm.upsert(draft) { savedId ->
+                            currentRuleId = savedId
+                            currentCloneSourceId = null
+                            dirty = false
+                            vm.sendTest(draft.copy(id = savedId))
+                        }
+                    }
+                },
+                enabled = canSave && !isTesting,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Save") }
+            ) {
+                if (isTesting) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.size(10.dp))
+                    Text("Saving and testing…")
+                } else {
+                    Text("Save and test")
+                }
+            }
+
+            OutlinedButton(
+                onClick = {
+                    vm.upsert(buildRule()) { savedId ->
+                        currentRuleId = savedId
+                        currentCloneSourceId = null
+                        dirty = false
+                    }
+                },
+                enabled = canSave && !isTesting,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (existing == null || isClone) "Save" else "Save changes") }
         }
     }
 }

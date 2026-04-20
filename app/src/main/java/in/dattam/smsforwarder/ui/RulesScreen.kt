@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
@@ -55,7 +56,7 @@ import `in`.dattam.smsforwarder.data.ForwardingRule
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RulesScreen(
-    onEdit: (Long?) -> Unit,
+    onEdit: (Long?, Boolean) -> Unit,
     onOpenEvents: () -> Unit,
     onOpenSettings: () -> Unit,
     vm: RulesViewModel = viewModel(),
@@ -85,7 +86,7 @@ fun RulesScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { onEdit(null) },
+                onClick = { onEdit(null, false) },
                 icon = { Icon(Icons.Default.Add, null) },
                 text = { Text("New rule") },
             )
@@ -95,7 +96,7 @@ fun RulesScreen(
         if (rules.isEmpty()) {
             EmptyState(
                 modifier = Modifier.fillMaxSize().padding(pad),
-                onAdd = { onEdit(null) },
+                onAdd = { onEdit(null, false) },
                 onSettings = onOpenSettings,
             )
             return@Scaffold
@@ -110,7 +111,8 @@ fun RulesScreen(
                     rule = rule,
                     lastEvent = latestByRule[rule.id],
                     onToggle = { vm.toggle(rule) },
-                    onEdit = { onEdit(rule.id) },
+                    onEdit = { onEdit(rule.id, false) },
+                    onClone = { onEdit(rule.id, true) },
                     onDelete = { toDelete = rule },
                 )
             }
@@ -138,6 +140,7 @@ private fun RuleRow(
     lastEvent: EventLog?,
     onToggle: () -> Unit,
     onEdit: () -> Unit,
+    onClone: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Card(
@@ -187,6 +190,11 @@ private fun RuleRow(
                     Icon(Icons.Default.Edit, null, Modifier.size(18.dp))
                     Spacer(Modifier.size(4.dp))
                     Text("Edit")
+                }
+                TextButton(onClick = onClone) {
+                    Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp))
+                    Spacer(Modifier.size(4.dp))
+                    Text("Clone")
                 }
                 TextButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, null, Modifier.size(18.dp))
