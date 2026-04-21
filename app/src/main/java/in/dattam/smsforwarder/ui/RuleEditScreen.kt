@@ -80,7 +80,7 @@ fun RuleEditScreen(
             retries = e.retries.toString(); sim = e.simSlot.toString()
             hydrated = true
             dirty = isClone
-        } else if (!hydrated && isNew && e == null) {
+        } else if (!hydrated && currentCloneSourceId == null && isNew && e == null) {
             hydrated = true
         }
     }
