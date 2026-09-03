@@ -9,7 +9,8 @@ Kotlin + Jetpack Compose + Room + WorkManager. Min SDK 26, target 36.
 - **Rule-based forwarding.** Multiple rules, each with its own sender pattern, URL, headers, SIM filter.
 - **Three match modes per rule:** `EXACT`, `WILDCARD` (shell-style `*VM-HDFCBK*`, `?`), `REGEX`.
 - **Optional body regex** to gate forwarding further (e.g. match only OTP messages).
-- **Persistent foreground service** keeps the receiver alive under Doze / OEM battery optimizers — the main reason other forwarders drop messages.
+- **Manifest SMS receiver + expedited WorkManager dispatch** wake the app only when a message arrives, avoiding an always-on foreground service.
+- **Optional enhanced reliability mode** enables a foreground service and requests unrestricted battery use only when the user chooses it.
 - **Dual-SIM aware.** Per-rule SIM filter; slot detection uses the empirically collected bundle-key list from bogkonstantin/android_income_sms_gateway_webhook.
 - **Exponential retry via WorkManager** with configurable max retries per rule.
 - **Self-signed cert bypass** toggle for internal endpoints.
@@ -44,12 +45,11 @@ Then:
 
 ## Reliability notes (read this)
 
-Silent SMS drops on Android are almost never a code bug — they're OEM aggressive battery management. After install:
+After install:
 
-1. Grant SMS + notifications permissions on first launch.
-2. Accept the battery-optimization exemption prompt.
-3. On Xiaomi / Oppo / Vivo / Realme / Samsung — open app info and enable **Autostart** and "allow background activity".
-4. Keep the persistent "SMS forwarding active" notification visible — killing it will let the OS terminate the process.
+1. Grant SMS permissions on first launch.
+2. If forwarding is unreliable on a device with aggressive OEM battery management, open app info and enable **Autostart** and "allow background activity" manually.
+3. Alternatively, enable **Enhanced reliability** under Defaults to keep the forwarding process running and request unrestricted battery use.
 
 ## Credits
 

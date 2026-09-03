@@ -15,7 +15,7 @@ import androidx.work.WorkManager
  *   1. Parse PDUs into sender + body + timestamp + SIM slot.
  *   2. Enqueue a SmsDispatchWorker with that data.
  *
- * All DB work (rule lookup, event logging, webhook enqueue) happens in the
+ * All DB work, rule matching, and normal webhook delivery happen in the
  * dispatch worker. This keeps the receiver synchronous and well under the
  * ~10 s BroadcastReceiver deadline even on a cold-started process with an
  * uninitialized Room database on slow storage.
@@ -50,6 +50,7 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
                 .build()
 
             val req = OneTimeWorkRequestBuilder<SmsDispatchWorker>()
+                .addTag(SmsDispatchWorker.TAG_DISPATCH)
                 .setInputData(data)
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build()

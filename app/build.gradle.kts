@@ -13,8 +13,8 @@ android {
         applicationId = "in.dattam.smsforwarder"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.2.1"
+        versionCode = 4
+        versionName = "0.3.0"
     }
 
     // Pull release-signing creds from ~/.gradle/gradle.properties (never committed).

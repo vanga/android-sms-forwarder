@@ -16,11 +16,16 @@ class EnumConverters {
     @TypeConverter fun toMode(v: String) = PatternMode.valueOf(v)
 }
 
-@Database(entities = [ForwardingRule::class, EventLog::class], version = 3, exportSchema = true)
+@Database(
+    entities = [ForwardingRule::class, EventLog::class, WebhookDelivery::class],
+    version = 4,
+    exportSchema = true,
+)
 @TypeConverters(EnumConverters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun ruleDao(): RuleDao
     abstract fun eventLogDao(): EventLogDao
+    abstract fun webhookDeliveryDao(): WebhookDeliveryDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -53,6 +58,37 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE webhook_deliveries (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        smsKey TEXT NOT NULL,
+                        ruleId INTEGER NOT NULL,
+                        ruleName TEXT NOT NULL,
+                        sender TEXT NOT NULL,
+                        body TEXT NOT NULL,
+                        sim INTEGER NOT NULL,
+                        sentTs INTEGER NOT NULL,
+                        recvTs INTEGER NOT NULL,
+                        maxAttempts INTEGER NOT NULL,
+                        attemptCount INTEGER NOT NULL,
+                        state TEXT NOT NULL,
+                        httpCode INTEGER,
+                        detail TEXT,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX index_webhook_deliveries_smsKey_ruleId " +
+                        "ON webhook_deliveries (smsKey, ruleId)"
+                )
+            }
+        }
+
         @Volatile private var instance: AppDatabase? = null
         fun get(ctx: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(
@@ -60,7 +96,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 "smsforwarder.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
                 .also { instance = it }
         }

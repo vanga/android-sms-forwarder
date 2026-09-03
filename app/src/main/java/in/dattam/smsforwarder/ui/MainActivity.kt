@@ -1,38 +1,42 @@
 package `in`.dattam.smsforwarder.ui
 
 import android.Manifest
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
-import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import `in`.dattam.smsforwarder.data.SettingsRepo
 import `in`.dattam.smsforwarder.service.ForwardingService
+import `in`.dattam.smsforwarder.sms.SimHelper
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    private var promptSettingsForMobile by mutableStateOf(false)
+
     private val permLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            checkAndPersistMobileNumber()
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        // Activity context = always foregrounded = always allowed to start the FGS.
-        ForwardingService.start(this)
         requestCorePermissions()
-        requestBatteryOptExempt()
 
         setContent {
             MaterialTheme {
@@ -40,6 +44,12 @@ class MainActivity : ComponentActivity() {
                     val nav = rememberNavController()
                     NavHost(nav, startDestination = "rules") {
                         composable("rules") {
+                            LaunchedEffect(promptSettingsForMobile) {
+                                if (promptSettingsForMobile) {
+                                    promptSettingsForMobile = false
+                                    nav.navigate("settings")
+                                }
+                            }
                             RulesScreen(
                                 onEdit = { id, clone ->
                                     val route = when {
@@ -66,6 +76,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
+        checkAndPersistMobileNumber()
+        lifecycleScope.launch {
+            if (SettingsRepo(this@MainActivity).current().enhancedReliability) {
+                ForwardingService.start(this@MainActivity)
+            }
+        }
     }
 
     private fun requestCorePermissions() {
@@ -74,20 +91,25 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.READ_SMS,
             Manifest.permission.READ_PHONE_STATE,
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            perms += Manifest.permission.POST_NOTIFICATIONS
-        }
         permLauncher.launch(perms.toTypedArray())
     }
 
-    private fun requestBatteryOptExempt() {
-        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-        if (pm.isIgnoringBatteryOptimizations(packageName)) return
-        runCatching {
-            startActivity(
-                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                    .setData(Uri.parse("package:$packageName"))
-            )
+    private fun checkAndPersistMobileNumber() {
+        lifecycleScope.launch {
+            val repo = SettingsRepo(this@MainActivity)
+            val current = repo.current()
+            if (current.mobileNumber.length == 10) {
+                promptSettingsForMobile = false
+                return@launch
+            }
+
+            val detected = SimHelper.readMobileNumber(this@MainActivity)
+            if (!detected.isNullOrBlank() && detected.length == 10) {
+                repo.save(current.copy(mobileNumber = detected))
+                promptSettingsForMobile = false
+            } else {
+                promptSettingsForMobile = true
+            }
         }
     }
 }

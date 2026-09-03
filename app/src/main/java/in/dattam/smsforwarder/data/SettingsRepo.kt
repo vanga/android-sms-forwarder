@@ -2,6 +2,7 @@ package `in`.dattam.smsforwarder.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -14,6 +15,7 @@ data class AppDefaults(
     val headersJson: String,
     val bodyTemplate: String,
     val mobileNumber: String,
+    val enhancedReliability: Boolean,
 ) {
     companion object {
         const val DEFAULT_HEADERS_JSON = "{\n  \"X-Api-Key\": \"replace-with-your-shared-secret\"\n}"
@@ -27,6 +29,7 @@ class SettingsRepo(private val ctx: Context) {
         val HEADERS = stringPreferencesKey("default_headers_json")
         val BODY = stringPreferencesKey("default_body_template")
         val MOBILE = stringPreferencesKey("default_mobile_number")
+        val ENHANCED_RELIABILITY = booleanPreferencesKey("enhanced_reliability")
     }
 
     val flow: Flow<AppDefaults> = ctx.dataStore.data.map { p -> p.toDefaults() }
@@ -38,6 +41,7 @@ class SettingsRepo(private val ctx: Context) {
             p[Keys.HEADERS] = d.headersJson
             p[Keys.BODY] = d.bodyTemplate
             p[Keys.MOBILE] = d.mobileNumber
+            p[Keys.ENHANCED_RELIABILITY] = d.enhancedReliability
         }
     }
 
@@ -45,5 +49,6 @@ class SettingsRepo(private val ctx: Context) {
         headersJson = this[Keys.HEADERS] ?: AppDefaults.DEFAULT_HEADERS_JSON,
         bodyTemplate = this[Keys.BODY] ?: "",
         mobileNumber = this[Keys.MOBILE] ?: "",
+        enhancedReliability = this[Keys.ENHANCED_RELIABILITY] ?: false,
     )
 }
