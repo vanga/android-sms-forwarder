@@ -96,8 +96,9 @@ fun RuleEditScreen(
             .filter { line -> runCatching { Regex(line) }.isFailure }
             .toList()
     }
+    val headersError = remember(headers) { validateJsonObject(headers) }
     val isTesting = testingId != null && testingId == currentRuleId
-    val canSave = url.isNotBlank() && pattern.isNotBlank() && badLines.isEmpty()
+    val canSave = url.isNotBlank() && pattern.isNotBlank() && badLines.isEmpty() && headersError == null
 
     fun buildRule(): ForwardingRule {
         val clampedRetries = (retries.toIntOrNull() ?: 10).coerceIn(1, 20)
@@ -189,10 +190,13 @@ fun RuleEditScreen(
             OutlinedTextField(
                 headers, { headers = it; dirty = true },
                 label = { Text("Headers JSON (rule-specific)") },
+                isError = headersError != null,
                 supportingText = {
                     Text(
-                        "Leave as {} to use only app-wide default headers. " +
-                            "Rule keys override defaults on collision."
+                        headersError ?: (
+                            "Leave as {} to use only app-wide default headers. " +
+                                "Rule keys override defaults on collision."
+                            )
                     )
                 },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),

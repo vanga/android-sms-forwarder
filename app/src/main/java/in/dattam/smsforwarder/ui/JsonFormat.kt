@@ -1,5 +1,8 @@
 package `in`.dattam.smsforwarder.ui
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+
 /**
  * Minimal pretty-printer for JSON-shaped strings. Does not parse or validate —
  * walks characters and inserts newlines + indentation based on structural
@@ -45,4 +48,11 @@ fun prettyJson(src: String, indent: String = "  "): String {
         }
     }
     return out.toString()
+}
+
+fun validateJsonObject(src: String): String? {
+    val normalized = src.ifBlank { "{}" }
+    return runCatching {
+        Json.decodeFromString<JsonObject>(normalized)
+    }.exceptionOrNull()?.message
 }
